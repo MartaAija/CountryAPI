@@ -1,0 +1,46 @@
+version: '3'
+
+services:
+  client:
+    build: ./client
+    ports:
+      - "3000:3000"
+    depends_on:
+      - server
+    environment:
+      - REACT_APP_ADMIN_USERNAME=admin
+      - REACT_APP_ADMIN_PASSWORD=admin1234
+    volumes:
+      - ./client:/app
+      - /app/node_modules
+
+  server:
+    build: ./secure-api-middleware
+    ports:
+      - "5000:5000"
+    depends_on:
+      - db
+    environment:
+      - DB_HOST=db
+      - DB_USER=user
+      - DB_PASSWORD=password123
+      - DB_NAME=country_api_db
+      - JWT_SECRET=your_jwt_secret
+    volumes:
+      - ./secure-api-middleware:/app
+      - /app/node_modules
+
+  db:
+    image: mysql:8.0
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_DATABASE=country_api_db
+      - MYSQL_USER=user
+      - MYSQL_PASSWORD=password123
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+volumes:
+  mysql_data:
