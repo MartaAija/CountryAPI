@@ -323,10 +323,10 @@ async function deleteApiKey(req, res) {
             return res.status(404).json({ error: "User not found" });
         }
 
-        // Set the fields to update based on key type
+        // Set the fields to update based on key type, but keep created_at with a default timestamp
         const updateFields = keyType === 'primary' ? 
-            'api_key_primary = NULL, is_active_primary = 0, created_at_primary = NULL, last_used_primary = NULL' :
-            'api_key_secondary = NULL, is_active_secondary = 0, created_at_secondary = NULL, last_used_secondary = NULL';
+            'api_key_primary = NULL, is_active_primary = 0, last_used_primary = NULL' :
+            'api_key_secondary = NULL, is_active_secondary = 0, last_used_secondary = NULL';
 
         // Execute the update
         const [result] = await db.query(
@@ -482,10 +482,10 @@ async function adminDeleteApiKey(req, res) {
             return res.status(404).json({ error: "User not found" });
         }
         
-        // Set the fields to update based on key type
+        // Set the fields to update based on key type, but keep created_at with a default timestamp
         const updateFields = keyType === 'primary' ?
-            'api_key_primary = NULL, is_active_primary = 0, created_at_primary = NULL, last_used_primary = NULL' :
-            'api_key_secondary = NULL, is_active_secondary = 0, created_at_secondary = NULL, last_used_secondary = NULL';
+            'api_key_primary = NULL, is_active_primary = 0, last_used_primary = NULL' :
+            'api_key_secondary = NULL, is_active_secondary = 0, last_used_secondary = NULL';
         
         // Execute the update
         const [result] = await db.query(
