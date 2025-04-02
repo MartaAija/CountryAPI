@@ -12,6 +12,7 @@ require("dotenv").config({ path: path.resolve(__dirname, "../.env") }); // Load 
  */
 const pool = mysql.createPool({
     host: process.env.DB_HOST,        // Database server location (from .env)
+    port: process.env.DB_PORT,        // Database server port (from .env)
     user: process.env.DB_USER,        // Database username (from .env)
     password: process.env.DB_PASSWORD, // Database password (from .env)
     database: process.env.DB_NAME,     // Database name (from .env)
@@ -90,6 +91,15 @@ async function initializeDatabase() {
 
 // Initialize database on startup
 initializeDatabase();
+
+// Debugging - log DB connection info (remove in production)
+console.log('DB Connection Details: ', {
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    database: process.env.DB_NAME,
+    // Don't log password for security reasons
+    hasPassword: !!process.env.DB_PASSWORD
+});
 
 // Export the pool for use in other modules
 module.exports = pool; 
