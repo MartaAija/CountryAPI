@@ -14,141 +14,85 @@ console.log('- DB_HOST present:', !!process.env.DB_HOST);
 console.log('- PORT:', process.env.PORT);
 console.log('===========================================');
 
-// Create connection pool
-let pool;
-try {
-  if (process.env.DATABASE_URL) {
-    console.log('Using DATABASE_URL for connection');
-    pool = mysql.createPool(process.env.DATABASE_URL);
-  } else {
-    console.log('Using individual connection parameters');
-    pool = mysql.createPool({
-      host: process.env.DB_HOST,
-      port: process.env.DB_PORT || 3306,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
+// Create connection pool using environment variables
+const pool = process.env.DATABASE_URL 
+  ? mysql.createPool(process.env.DATABASE_URL)
+  : mysql.createPool({
+      host: process.env.DB_HOST || 'localhost',
+      user: process.env.DB_USER || 'root',
+      password: process.env.DB_PASSWORD || '',
+      database: process.env.DB_NAME || 'country_api_db',
       waitForConnections: true,
       connectionLimit: 10,
       queueLimit: 0
     });
-  }
-  console.log('Connection pool created successfully');
-} catch (error) {
-  console.error('CRITICAL ERROR: Failed to create connection pool:', error);
-  process.exit(1); // Exit if we can't even create the pool
-}
 
-// Sleep function for delays
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+console.log(process.env.DATABASE_URL ? "Using DATABASE_URL connection string" : "Using individual connection parameters");
+console.log("Connection pool created successfully");
+console.log("Starting database initialization...");
 
-// Function to initialize database with retries
-async function initializeDatabase(retries = 10, delay = 5000) {
+// Initialize database with correct schema matching Railway MySQL table structure
+const initializeDatabase = async (retries = 10, delay = 5000) => {
+  console.log(`\nDatabase initialization attempt 1/${retries}`);
   let connection;
-  try {
-    console.log(`\nDatabase initialization attempt ${11-retries}/10`);
-    
-    // Test connection first
-    console.log('Getting connection from pool...');
-    connection = await pool.getConnection();
-    console.log('✅ Successfully connected to database!');
-    
-    // Verify we can run queries
-    console.log('Testing query execution...');
-    const [testResult] = await connection.query('SELECT 1 as test');
-    console.log('✅ Query test successful:', testResult);
-    
-    // Check if users table exists
-    console.log('Checking if users table exists...');
-    const [tables] = await connection.query(`
-      SELECT TABLE_NAME FROM information_schema.TABLES 
-      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'
-    `);
-    
-    if (tables.length === 0) {
-      console.log('Users table does not exist. Creating it now...');
+  
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      console.log("Getting connection from pool...");
+      connection = await pool.getConnection();
+      
+      // Create users table with exact schema from Railway
       await connection.query(`
         CREATE TABLE IF NOT EXISTS users (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          username VARCHAR(255) NOT NULL UNIQUE,
-          password VARCHAR(255) NOT NULL,
-          first_name VARCHAR(255),
-          last_name VARCHAR(255),
-          api_key_primary VARCHAR(255),
-          api_key_secondary VARCHAR(255),
-          is_active_primary BOOLEAN DEFAULT false,
-          is_active_secondary BOOLEAN DEFAULT false,
-          created_at_primary DATETIME,
-          created_at_secondary DATETIME,
-          last_used_primary DATETIME,
-          last_used_secondary DATETIME,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
+          id int(11) NOT NULL AUTO_INCREMENT,
+          first_name varchar(60) COLLATE utf8mb4_general_ci NOT NULL,
+          last_name varchar(60) COLLATE utf8mb4_general_ci NOT NULL,
+          username varchar(45) COLLATE utf8mb4_general_ci NOT NULL,
+          password_hash varchar(255) COLLATE utf8mb4_general_ci NOT NULL,
+          api_key_primary varchar(30) COLLATE utf8mb4_general_ci DEFAULT NULL,
+          created_at_primary timestamp NOT NULL DEFAULT current_timestamp(),
+          is_active_primary tinyint(1) DEFAULT 0,
+          last_used_primary datetime DEFAULT NULL,
+          api_key_secondary varchar(30) COLLATE utf8mb4_general_ci DEFAULT NULL,
+          is_active_secondary tinyint(1) DEFAULT 0,
+          created_at_secondary timestamp NOT NULL DEFAULT current_timestamp(),
+          last_used_secondary datetime DEFAULT NULL,
+          PRIMARY KEY (id),
+          UNIQUE KEY username (username)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
       `);
-      console.log('✅ Users table created successfully!');
-    } else {
-      console.log('✅ Users table already exists.');
-    }
-    
-    // Check if api_key_usage table exists
-    console.log('Checking if api_key_usage table exists...');
-    const [apiKeyTables] = await connection.query(`
-      SELECT TABLE_NAME FROM information_schema.TABLES 
-      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'api_key_usage'
-    `);
-    
-    if (apiKeyTables.length === 0) {
-      console.log('api_key_usage table does not exist. Creating it now...');
-      await connection.query(`
-        CREATE TABLE IF NOT EXISTS api_key_usage (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          api_key VARCHAR(255) NOT NULL,
-          endpoint VARCHAR(255) NOT NULL,
-          used_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-      console.log('✅ api_key_usage table created successfully!');
-    } else {
-      console.log('✅ api_key_usage table already exists.');
-    }
-    
-    // List all tables for verification
-    console.log('Getting a list of all tables...');
-    const [allTables] = await connection.query(`SHOW TABLES`);
-    console.log('✅ Tables in database:', allTables.map(row => Object.values(row)[0]));
-    
-    console.log('DATABASE INITIALIZATION COMPLETED SUCCESSFULLY');
-    
-    return true;
-  } catch (error) {
-    console.error('❌ DATABASE INITIALIZATION ERROR:', error.message);
-    
-    if (retries > 0) {
-      console.log(`Will retry in ${delay/1000} seconds... (${retries-1} retries remaining)`);
-      await sleep(delay);
-      return initializeDatabase(retries - 1, delay);
-    } else {
-      console.error('❌ ALL RETRIES FAILED. Database initialization unsuccessful.');
-      return false;
-    }
-  } finally {
-    if (connection) {
-      console.log('Releasing database connection');
+      
+      
+      console.log("✅ Database initialization successful");
+      console.log("Tables created successfully:");
+      
+      // Show existing tables
+      const [tables] = await connection.query("SHOW TABLES");
+      console.log("Tables:", tables.map(t => Object.values(t)[0]).join(", "));
+      
       connection.release();
+      return;
+      
+    } catch (error) {
+      console.log(`❌ DATABASE INITIALIZATION ERROR: ${error.message}`);
+      
+      if (connection) {
+        connection.release();
+      }
+      
+      if (attempt < retries) {
+        console.log(`Will retry in ${delay/1000} seconds... (${retries - attempt} retries remaining)`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        console.log(`\nDatabase initialization attempt ${attempt + 1}/${retries}`);
+      } else {
+        console.log(`Failed to initialize database after ${retries} attempts.`);
+        // Don't throw error - let app start anyway but it will likely fail on DB operations
+      }
     }
   }
-}
+};
 
-// Initialize database immediately
-(async () => {
-  console.log('Starting database initialization...');
-  const success = await initializeDatabase();
-  if (success) {
-    console.log('Database is ready for use!');
-  } else {
-    console.error('WARNING: Database initialization failed after all retries.');
-    console.log('The application will continue, but database operations may fail.');
-  }
-})();
+// Start initialization
+initializeDatabase();
 
 module.exports = pool; 
