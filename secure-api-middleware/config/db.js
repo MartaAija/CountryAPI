@@ -54,45 +54,51 @@ testConn();
 // Function to test connection and initialize database if needed
 async function initializeDatabase() {
     try {
-        // Test connection
-        await pool.query('SELECT 1');
-        console.log('Database connection successful');
+        console.log("Testing database connection...");
+        await pool.query("SELECT 1");
+        console.log("Database connection successful!");
+
+        // Check if tables exist and create them if they don't
+        console.log("Checking database schema...");
         
-        // Check if users table exists
-        const [tables] = await pool.query(`
-            SELECT TABLE_NAME FROM information_schema.TABLES 
-            WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'users'
-        `, [process.env.DB_NAME]);
+        // Create users table if it doesn't exist
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS users (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                username VARCHAR(255) NOT NULL UNIQUE,
+                password VARCHAR(255) NOT NULL,
+                first_name VARCHAR(255),
+                last_name VARCHAR(255),
+                api_key_primary VARCHAR(255),
+                api_key_secondary VARCHAR(255),
+                is_active_primary BOOLEAN DEFAULT false,
+                is_active_secondary BOOLEAN DEFAULT false,
+                created_at_primary DATETIME,
+                created_at_secondary DATETIME,
+                last_used_primary DATETIME,
+                last_used_secondary DATETIME,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        console.log("Users table checked/created");
         
-        // If users table doesn't exist, create necessary tables
-        if (tables.length === 0) {
-            console.log('Initializing database schema...');
-            
-            // Create users table
-            await pool.query(`
-                CREATE TABLE users (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    username VARCHAR(255) NOT NULL UNIQUE,
-                    password VARCHAR(255) NOT NULL,
-                    first_name VARCHAR(255),
-                    last_name VARCHAR(255),
-                    api_key_primary VARCHAR(255),
-                    api_key_secondary VARCHAR(255),
-                    is_active_primary BOOLEAN DEFAULT false,
-                    is_active_secondary BOOLEAN DEFAULT false,
-                    created_at_primary DATETIME,
-                    created_at_secondary DATETIME,
-                    last_used_primary DATETIME,
-                    last_used_secondary DATETIME,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                )
-            `);
-            
-            console.log('Database schema initialized successfully');
-        }
+        // Add any other tables your application needs
+        // Example: API key usage tracking table
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS api_key_usage (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                api_key VARCHAR(255) NOT NULL,
+                endpoint VARCHAR(255) NOT NULL,
+                used_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        console.log("API key usage table checked/created");
+        
+        console.log("Database initialization complete!");
     } catch (error) {
-        console.error('Database initialization error:', error);
-        throw error;
+        console.error("Database initialization error:", error);
+        // Don't throw the error - log it but allow the server to start
+        // This prevents crashing if there's a temporary DB issue
     }
 }
 

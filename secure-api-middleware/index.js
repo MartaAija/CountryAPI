@@ -34,8 +34,14 @@ app.get('/', (req, res) => {
     res.send('Secure API Middleware is running...');
 });
 
+// Add proper error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: 'Something went wrong!' });
+});
+
 // Start the server
 const PORT = process.env.PORT || 5000;  // Use environment port or default to 5000
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
 }); 
