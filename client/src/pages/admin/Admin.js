@@ -53,15 +53,15 @@ function Admin() {
     // Delete an API key for a user
     const handleDeleteApiKey = async (userId, keyType) => {
         try {
-            await axios({
-                method: 'DELETE',
-                url: `${config.apiBaseUrl}/auth/admin/delete-api-key/${userId}`,
-                headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-                data: { keyType }
-            });
+            // Use query parameters instead of request body for DELETE
+            await axios.delete(
+                `${config.apiBaseUrl}/auth/admin/delete-api-key/${userId}?keyType=${keyType}`,
+                { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+            );
             await fetchUsers(); // Refresh the user list
             setMessage(`${keyType} API key deleted successfully`);
         } catch (error) {
+            console.error("Admin delete API key error:", error);
             setMessage('Failed to delete API key: ' + (error.response?.data?.error || error.message));
         }
     };

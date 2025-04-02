@@ -17,7 +17,6 @@ function Settings() {
     const [isEditing, setIsEditing] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [apiKeys, setApiKeys] = useState([]);
-    const [showApiKeyModal, setShowApiKeyModal] = useState(false);
 
     // Use config for API base URL
     const API_BASE_URL = `${config.apiBaseUrl}/auth`;
@@ -185,16 +184,16 @@ function Settings() {
                 return;
             }
             
-            await axios({
-                method: 'DELETE',
-                url: `${API_BASE_URL}/delete-api-key/${userDetails.id}`,
-                headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-                data: { keyType }
-            });
+            // Use query parameters instead of request body for DELETE
+            await axios.delete(
+                `${API_BASE_URL}/delete-api-key/${userDetails.id}?keyType=${keyType}`,
+                { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+            );
             
             setMessage(`${keyType} API key deleted successfully`);
             await fetchUserData(); // Refresh user data
         } catch (error) {
+            console.error("Delete API key error:", error);
             setMessage(error.response?.data?.error || "Failed to delete API key");
         }
     };
@@ -431,32 +430,6 @@ function Settings() {
                             <button 
                                 className="btn-secondary"
                                 onClick={() => setShowDeleteModal(false)}
-                            >
-                                Cancel
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {showApiKeyModal && userDetails?.api_key && (
-                <div className="modal-overlay">
-                    <div className="modal">
-                        <h3>Delete API Key</h3>
-                        <p>Are you sure you want to delete this API key? This action cannot be undone.</p>
-                        <div className="api-key-preview">
-                            {userDetails.api_key}
-                        </div>
-                        <div className="controls">
-                            <button 
-                                className="btn-danger"
-                                onClick={handleDeleteApiKey}
-                            >
-                                Yes, Delete API Key
-                            </button>
-                            <button 
-                                className="btn-secondary"
-                                onClick={() => setShowApiKeyModal(false)}
                             >
                                 Cancel
                             </button>

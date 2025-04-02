@@ -308,7 +308,8 @@ async function toggleApiKey(req, res) {
 async function deleteApiKey(req, res) {
     try {
         const userId = req.user.id;
-        const { keyType } = req.body; // 'primary' or 'secondary'
+        // Get keyType from query params OR request body
+        const keyType = req.query.keyType || req.body.keyType;
 
         if (!keyType) {
             return res.status(400).json({ error: "Key type is required" });
@@ -450,7 +451,12 @@ async function adminToggleApiKey(req, res) {
 async function adminDeleteApiKey(req, res) {
     try {
         const { userId } = req.params;
-        const { keyType } = req.body;
+        // Get keyType from query params OR request body
+        const keyType = req.query.keyType || req.body.keyType;
+        
+        if (!keyType) {
+            return res.status(400).json({ error: "Key type is required" });
+        }
         
         const updateFields = keyType === 'secondary' ?
             'api_key_secondary = NULL, is_active_secondary = 0, created_at_secondary = NULL, last_used_secondary = NULL' :
