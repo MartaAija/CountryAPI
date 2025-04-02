@@ -31,7 +31,7 @@ console.log(process.env.DATABASE_URL ? "Using DATABASE_URL connection string" : 
 console.log("Connection pool created successfully");
 console.log("Starting database initialization...");
 
-// Initialize database with correct schema matching Railway MySQL table structure
+// Initialize database with correct schema
 const initializeDatabase = async (retries = 10, delay = 5000) => {
   console.log(`\nDatabase initialization attempt 1/${retries}`);
   let connection;
@@ -41,9 +41,15 @@ const initializeDatabase = async (retries = 10, delay = 5000) => {
       console.log("Getting connection from pool...");
       connection = await pool.getConnection();
       
-      // Create users table with exact schema from Railway
+      // Drop existing tables
+      console.log("Dropping existing tables...");
+      await connection.query("DROP TABLE IF EXISTS api_key_usage");
+      await connection.query("DROP TABLE IF EXISTS users");
+      
+      console.log("Creating users table with correct schema...");
+      // Create users table with the exact schema needed
       await connection.query(`
-        CREATE TABLE IF NOT EXISTS users (
+        CREATE TABLE users (
           id int(11) NOT NULL AUTO_INCREMENT,
           first_name varchar(60) COLLATE utf8mb4_general_ci NOT NULL,
           last_name varchar(60) COLLATE utf8mb4_general_ci NOT NULL,
@@ -61,7 +67,6 @@ const initializeDatabase = async (retries = 10, delay = 5000) => {
           UNIQUE KEY username (username)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
       `);
-      
       
       console.log("✅ Database initialization successful");
       console.log("Tables created successfully:");
@@ -92,7 +97,8 @@ const initializeDatabase = async (retries = 10, delay = 5000) => {
   }
 };
 
-// Start initialization
+// Start initialization immediately
 initializeDatabase();
 
+// Export the pool for use in other modules
 module.exports = pool; 
