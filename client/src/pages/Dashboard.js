@@ -306,13 +306,13 @@ function Dashboard() {
 
                 {/* Search input with suggestions dropdown */}
                 <div className="search-container" ref={searchContainerRef}>
-                    <form onSubmit={handleSearch} className="search-form">
-                        <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
+            <form onSubmit={handleSearch} className="search-form">
+                <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
                             placeholder={getPlaceholderText()}
-                            className="search-input"
+                    className="search-input"
                             disabled={!userApiKey}
                         />
                         <div className="search-form-controls">
@@ -320,8 +320,8 @@ function Dashboard() {
                                 type="submit"
                                 disabled={loading || !userApiKey}
                             >
-                                {loading ? 'Searching...' : 'Search'}
-                            </button>
+                    {loading ? 'Searching...' : 'Search'}
+                </button>
                             <button 
                                 type="button"
                                 onClick={toggleSort}
@@ -345,7 +345,7 @@ function Dashboard() {
                                 </button>
                             )}
                         </div>
-                    </form>
+            </form>
 
                     {/* Search suggestions dropdown */}
                     {showSuggestions && searchSuggestions.length > 0 && (
@@ -404,32 +404,32 @@ function Dashboard() {
             <div className="countries-grid">
                 {filteredData && filteredData.length > 0 ? (
                     filteredData.map((country, index) => (
-                        <div key={index} className="country-card">
-                            <h3>{country.name}</h3>
-                            <img src={country.flag} alt={`Flag of ${country.name}`} className="country-flag" />
-                            
-                            <div className="country-info">
+                <div key={index} className="country-card">
+                    <h3>{country.name}</h3>
+                    <img src={country.flag} alt={`Flag of ${country.name}`} className="country-flag" />
+                    
+                    <div className="country-info">
                                 <div className="info-row">
                                     <strong>Capital:</strong>
                                     <span>{country.capital || 'N/A'}</span>
                                 </div>
                         
                                 <div className="info-row">
-                                    <strong>Currency:</strong>
+                            <strong>Currency:</strong>
                                     {country.currency ? (
                                         <span className="currency-details">
                                             {country.currency.name} ({country.currency.code} {country.currency.symbol})
                                         </span>
                                     ) : (
                                         <span>No currency data available</span>
-                                    )}
-                                </div>
+                            )}
+                        </div>
 
                                 <div className="info-row">
-                                    <strong>Languages:</strong>
+                            <strong>Languages:</strong>
                                     {country.languages && country.languages.length > 0 ? (
                                         <span className="language-list">
-                                            {country.languages.map((lang, idx) => (
+                                {country.languages.map((lang, idx) => (
                                                 <span key={idx} className="language-pill">{lang}</span>
                                             ))}
                                         </span>
@@ -445,7 +445,7 @@ function Dashboard() {
                         <p>No countries found matching "{searchQuery}". Please try a different search term.</p>
                     </div>
                 ) : null}
-            </div>
+                </div>
 
             {/* Back to top button - appears when scrolling down */}
             <button 

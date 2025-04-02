@@ -11,8 +11,18 @@ require('dotenv').config();  // Load environment variables from .env file
 // Initialize Express application
 const app = express();
 
+// Get allowed origins from environment or use defaults
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',') 
+  : ['http://localhost:3000'];
+
+//CORS configuration to allow requests from Railway
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true
+}));
+
 // Apply middleware
-app.use(cors());  // Enable Cross-Origin Resource Sharing for all routes
 app.use(express.json());  // Parse JSON request bodies
 
 // Register route modules
