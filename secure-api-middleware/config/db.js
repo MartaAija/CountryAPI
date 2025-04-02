@@ -6,20 +6,30 @@ const mysql = require("mysql2/promise");  // Using promise-based MySQL driver fo
 const path = require("path");
 require("dotenv").config({ path: path.resolve(__dirname, "../.env") }); // Load environment variables from .env file
 
-/**
- * Database connection pool configuration
- * Manages connections to MySQL database efficiently
- */
-const pool = mysql.createPool({
-    host: process.env.DB_HOST,        // Database server location (from .env)
-    port: process.env.DB_PORT,        // Database server port (from .env)
-    user: process.env.DB_USER,        // Database username (from .env)
-    password: process.env.DB_PASSWORD, // Database password (from .env)
-    database: process.env.DB_NAME,     // Database name (from .env)
-    waitForConnections: true,         // Wait for connection if all are busy
-    connectionLimit: 10,              // Maximum number of connections in pool
-    queueLimit: 0                     // Unlimited queue size (0 = no limit)
+// Debugging - log DB connection info (remove in production)
+console.log('Attempting database connection with:', {
+    directParams: {
+        host: process.env.DB_HOST,
+        user: process.env.DB_USER,
+        database: process.env.DB_NAME,
+        hasPassword: !!process.env.DB_PASSWORD
+    },
+    hasConnectionUrl: !!process.env.DATABASE_URL
 });
+
+// Create connection pool - prioritize connection URL if available
+const pool = process.env.DATABASE_URL 
+    ? mysql.createPool(process.env.DATABASE_URL)  // Use connection URL if available
+    : mysql.createPool({                         // Fall back to individual params
+        host: process.env.DB_HOST,
+        port: process.env.DB_PORT,
+        user: process.env.DB_USER,
+        password: process.env.DB_PASSWORD,
+        database: process.env.DB_NAME,
+        waitForConnections: true,
+        connectionLimit: 10,
+        queueLimit: 0
+    });
 
 /**
  * Test database connection on application startup
@@ -77,9 +87,6 @@ async function initializeDatabase() {
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
             `);
-            
-            // Create any other necessary tables
-            // Add more CREATE TABLE statements here...
             
             console.log('Database schema initialized successfully');
         }
