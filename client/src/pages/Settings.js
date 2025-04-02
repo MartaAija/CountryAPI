@@ -184,17 +184,41 @@ function Settings() {
                 return;
             }
             
-            // Use query parameters instead of request body for DELETE
-            await axios.delete(
-                `${API_BASE_URL}/delete-api-key/${userDetails.id}?keyType=${keyType}`,
-                { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
-            );
+            console.log(`Attempting to delete ${keyType} API key for user ${userDetails.id}`);
             
-            setMessage(`${keyType} API key deleted successfully`);
-            await fetchUserData(); // Refresh user data
+            // First try with query parameters
+            const response = await axios({
+                method: 'DELETE',
+                url: `${API_BASE_URL}/delete-api-key/${userDetails.id}`,
+                headers: { 
+                    Authorization: `Bearer ${localStorage.getItem("token")}`,
+                    'Content-Type': 'application/json'
+                },
+                params: { keyType }
+            });
+            
+            console.log("API key deletion response:", response.data);
+            
+            if (response.data.success) {
+                setMessage(`${keyType} API key deleted successfully`);
+                // Update local state before fetching new data
+                setUserDetails(prev => ({
+                    ...prev,
+                    [`api_key_${keyType}`]: null,
+                    [`is_active_${keyType}`]: false,
+                    [`created_at_${keyType}`]: null,
+                    [`last_used_${keyType}`]: null
+                }));
+                await fetchUserData(); // Refresh user data
+            } else {
+                throw new Error("API responded but deletion may have failed");
+            }
         } catch (error) {
             console.error("Delete API key error:", error);
             setMessage(error.response?.data?.error || "Failed to delete API key");
+            // Even if there's an error response, the key might have been deleted
+            // so refresh the data anyway
+            await fetchUserData();
         }
     };
 

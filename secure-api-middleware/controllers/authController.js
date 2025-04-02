@@ -308,25 +308,41 @@ async function toggleApiKey(req, res) {
 async function deleteApiKey(req, res) {
     try {
         const userId = req.user.id;
-        // Get keyType from query params OR request body
-        const keyType = req.query.keyType || req.body.keyType;
+        // Check for keyType in both query params and request body
+        const keyType = req.query.keyType || (req.body ? req.body.keyType : null);
+
+        console.log("Delete API Key request:", { userId, keyType, query: req.query, body: req.body });
 
         if (!keyType) {
             return res.status(400).json({ error: "Key type is required" });
         }
 
+        // Verify the user exists
+        const [userCheck] = await db.query("SELECT id FROM users WHERE id = ?", [userId]);
+        if (userCheck.length === 0) {
+            return res.status(404).json({ error: "User not found" });
+        }
+
+        // Set the fields to update based on key type
         const updateFields = keyType === 'primary' ? 
             'api_key_primary = NULL, is_active_primary = 0, created_at_primary = NULL, last_used_primary = NULL' :
             'api_key_secondary = NULL, is_active_secondary = 0, created_at_secondary = NULL, last_used_secondary = NULL';
 
-        await db.query(
+        // Execute the update
+        const [result] = await db.query(
             `UPDATE users SET ${updateFields} WHERE id = ?`, 
             [userId]
         );
 
-        res.json({ message: `${keyType} API key deleted successfully` });
+        // Check if the update affected any rows
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: "Failed to update API key - user not found" });
+        }
+
+        res.json({ message: `${keyType} API key deleted successfully`, success: true });
     } catch (err) {
-        res.status(500).json({ error: "Failed to delete API key" });
+        console.error("API key deletion error:", err);
+        res.status(500).json({ error: "Failed to delete API key: " + err.message });
     }
 }
 
@@ -451,25 +467,41 @@ async function adminToggleApiKey(req, res) {
 async function adminDeleteApiKey(req, res) {
     try {
         const { userId } = req.params;
-        // Get keyType from query params OR request body
-        const keyType = req.query.keyType || req.body.keyType;
+        // Check for keyType in both query params and request body
+        const keyType = req.query.keyType || (req.body ? req.body.keyType : null);
+        
+        console.log("Admin Delete API Key request:", { userId, keyType, query: req.query, body: req.body });
         
         if (!keyType) {
             return res.status(400).json({ error: "Key type is required" });
         }
         
-        const updateFields = keyType === 'secondary' ?
-            'api_key_secondary = NULL, is_active_secondary = 0, created_at_secondary = NULL, last_used_secondary = NULL' :
-            'api_key_primary = NULL, is_active_primary = 0, created_at_primary = NULL, last_used_primary = NULL';
+        // Verify the user exists
+        const [userCheck] = await db.query("SELECT id FROM users WHERE id = ?", [userId]);
+        if (userCheck.length === 0) {
+            return res.status(404).json({ error: "User not found" });
+        }
         
-        await db.query(
+        // Set the fields to update based on key type
+        const updateFields = keyType === 'primary' ?
+            'api_key_primary = NULL, is_active_primary = 0, created_at_primary = NULL, last_used_primary = NULL' :
+            'api_key_secondary = NULL, is_active_secondary = 0, created_at_secondary = NULL, last_used_secondary = NULL';
+        
+        // Execute the update
+        const [result] = await db.query(
             `UPDATE users SET ${updateFields} WHERE id = ?`,
             [userId]
         );
+        
+        // Check if the update affected any rows
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: "Failed to update API key - user not found" });
+        }
 
-        res.json({ message: "API key deleted successfully" });
+        res.json({ message: "API key deleted successfully", success: true });
     } catch (error) {
-        res.status(500).json({ error: "Failed to delete API key" });
+        console.error("Admin API key deletion error:", error);
+        res.status(500).json({ error: "Failed to delete API key: " + error.message });
     }
 }
 
