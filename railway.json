@@ -1,0 +1,11 @@
+{
+  "schema": "v2",
+  "build": {
+    "builder": "nixpacks",
+    "buildCommand": "echo 'Selecting service to build'"
+  },
+  "deploy": {
+    "numReplicas": 1,
+    "startCommand": "echo 'Please use subfolders directly'"
+  }
+}
