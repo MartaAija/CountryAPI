@@ -12,10 +12,10 @@ const pool = require('./config/db');
 // Initialize Express application
 const app = express();
 
-// Get allowed origins from environment or use defaults
+// Get allowed origins from environment or use defaults with Netlify domain
 const allowedOrigins = process.env.ALLOWED_ORIGINS 
   ? process.env.ALLOWED_ORIGINS.split(',') 
-  : ['http://localhost:3000'];
+  : ['http://localhost:3000', 'https://illustrious-nougat-89c023.netlify.app'];
 
 //CORS configuration to allow requests from Railway
 app.use(cors({

@@ -2,7 +2,7 @@
 const config = {
   // API base URL - use environment variable with localhost as fallback
   apiBaseUrl: process.env.NODE_ENV === 'production'
-    ? 'https://countryapi-production-3382.up.railway.app' 
+    ? 'https://countryapi-production-5484.up.railway.app'  // Your new Railway URL
     : 'http://localhost:5000',
   
   // Additional configuration variables can be added here
