@@ -185,13 +185,12 @@ function Settings() {
                 return;
             }
             
-            await axios.delete(
-                `${API_BASE_URL}/delete-api-key/${userDetails.id}`,
-                {
-                    headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-                    data: { keyType }
-                }
-            );
+            await axios({
+                method: 'DELETE',
+                url: `${API_BASE_URL}/delete-api-key/${userDetails.id}`,
+                headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+                data: { keyType }
+            });
             
             setMessage(`${keyType} API key deleted successfully`);
             await fetchUserData(); // Refresh user data

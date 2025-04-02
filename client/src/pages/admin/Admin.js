@@ -53,13 +53,16 @@ function Admin() {
     // Delete an API key for a user
     const handleDeleteApiKey = async (userId, keyType) => {
         try {
-            await axios.delete(`${config.apiBaseUrl}/auth/admin/delete-api-key/${userId}`, {
+            await axios({
+                method: 'DELETE',
+                url: `${config.apiBaseUrl}/auth/admin/delete-api-key/${userId}`,
+                headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
                 data: { keyType }
             });
             await fetchUsers(); // Refresh the user list
             setMessage(`${keyType} API key deleted successfully`);
         } catch (error) {
-            setMessage('Failed to delete API key');
+            setMessage('Failed to delete API key: ' + (error.response?.data?.error || error.message));
         }
     };
 
