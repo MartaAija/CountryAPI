@@ -35,7 +35,7 @@ app.get('/', (req, res) => {
     res.send('Secure API Middleware is running...');
 });
 
-// Add a simple health check endpoint
+// Update your health endpoint with more details
 app.get('/health', async (req, res) => {
   try {
     // Check database connection
@@ -44,16 +44,29 @@ app.get('/health', async (req, res) => {
     // List tables
     const [tables] = await pool.query('SHOW TABLES');
     
+    // Get database info
+    const [dbInfo] = await pool.query('SELECT DATABASE() as db');
+    
     res.json({
       status: 'ok',
-      database: 'connected',
-      tables: tables.map(row => Object.values(row)[0]),
+      database: {
+        connected: true,
+        name: dbInfo[0].db,
+        tables: tables.map(row => Object.values(row)[0]),
+      },
+      environment: {
+        nodeEnv: process.env.NODE_ENV,
+        hasDbUrl: !!process.env.DATABASE_URL,
+        allowedOrigins: process.env.ALLOWED_ORIGINS,
+        port: process.env.PORT
+      },
       timestamp: new Date().toISOString()
     });
   } catch (error) {
     res.status(500).json({
       status: 'error',
-      message: error.message
+      message: error.message,
+      stack: process.env.NODE_ENV === 'production' ? undefined : error.stack
     });
   }
 });
@@ -64,8 +77,10 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Something went wrong!' });
 });
 
-// Start the server
-const PORT = process.env.PORT || 5000;  // Use environment port or default to 5000
-app.listen(PORT, '0.0.0.0', () => {
+// Start the server with a small delay to allow database initialization
+const PORT = process.env.PORT || 5000;
+setTimeout(() => {
+  app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
-}); 
+  });
+}, 5000); // 5 second delay to give database initialization time to complete 
