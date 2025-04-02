@@ -8,7 +8,6 @@
     "@testing-library/react": "^14.0.0",
     "@testing-library/user-event": "^14.6.1",
     "axios": "^1.8.1",
-    "gh-pages": "^6.3.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.22.0",
@@ -41,5 +40,8 @@
       "last 1 safari version"
     ]
   },
-  "homepage": "/"
+  "homepage": "/",
+  "devDependencies": {
+    "gh-pages": "^6.3.0"
+  }
 }

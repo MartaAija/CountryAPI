@@ -19,7 +19,10 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
 
 //CORS configuration to allow requests from Railway
 app.use(cors({
-  origin: allowedOrigins,
+  origin: [
+    'http://localhost:3000',
+    'https://martaaija.github.io'
+  ],
   credentials: true
 }));
 
