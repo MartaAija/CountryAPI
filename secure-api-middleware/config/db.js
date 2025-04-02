@@ -5,14 +5,6 @@
 const mysql = require("mysql2/promise");
 require("dotenv").config();
 
-// Extensive logging for debugging
-console.log('===========================================');
-console.log('DATABASE CONNECTION SETUP STARTING');
-console.log('Environment variables check:');
-console.log('- DATABASE_URL present:', !!process.env.DATABASE_URL);
-console.log('- DB_HOST present:', !!process.env.DB_HOST);
-console.log('- PORT:', process.env.PORT);
-console.log('===========================================');
 
 // Create connection pool using environment variables
 const pool = process.env.DATABASE_URL 
@@ -27,26 +19,14 @@ const pool = process.env.DATABASE_URL
       queueLimit: 0
     });
 
-console.log(process.env.DATABASE_URL ? "Using DATABASE_URL connection string" : "Using individual connection parameters");
-console.log("Connection pool created successfully");
-console.log("Starting database initialization...");
-
 // Initialize database with correct schema
 const initializeDatabase = async (retries = 10, delay = 5000) => {
-  console.log(`\nDatabase initialization attempt 1/${retries}`);
   let connection;
   
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      console.log("Getting connection from pool...");
       connection = await pool.getConnection();
-      
-      // Drop existing tables
-      console.log("Dropping existing tables...");
-      await connection.query("DROP TABLE IF EXISTS api_key_usage");
-      await connection.query("DROP TABLE IF EXISTS users");
-      
-      console.log("Creating users table with correct schema...");
+    
       // Create users table with the exact schema needed
       await connection.query(`
         CREATE TABLE users (
@@ -68,18 +48,14 @@ const initializeDatabase = async (retries = 10, delay = 5000) => {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
       `);
       
-      console.log("✅ Database initialization successful");
-      console.log("Tables created successfully:");
       
       // Show existing tables
       const [tables] = await connection.query("SHOW TABLES");
-      console.log("Tables:", tables.map(t => Object.values(t)[0]).join(", "));
       
       connection.release();
       return;
       
     } catch (error) {
-      console.log(`❌ DATABASE INITIALIZATION ERROR: ${error.message}`);
       
       if (connection) {
         connection.release();
@@ -88,7 +64,6 @@ const initializeDatabase = async (retries = 10, delay = 5000) => {
       if (attempt < retries) {
         console.log(`Will retry in ${delay/1000} seconds... (${retries - attempt} retries remaining)`);
         await new Promise(resolve => setTimeout(resolve, delay));
-        console.log(`\nDatabase initialization attempt ${attempt + 1}/${retries}`);
       } else {
         console.log(`Failed to initialize database after ${retries} attempts.`);
         // Don't throw error - let app start anyway but it will likely fail on DB operations

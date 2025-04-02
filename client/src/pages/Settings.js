@@ -194,11 +194,9 @@ function Settings() {
             );
             
             setMessage(`${keyType} API key deleted successfully`);
-            setShowApiKeyModal(false);
             await fetchUserData(); // Refresh user data
         } catch (error) {
             setMessage(error.response?.data?.error || "Failed to delete API key");
-            setShowApiKeyModal(false);
         }
     };
 

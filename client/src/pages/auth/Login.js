@@ -42,10 +42,10 @@ function Login() {
             localStorage.setItem('token', response.data.token);
             localStorage.setItem('isAdmin', 'false');
             
-            // Trigger storage event for immediate navbar update
-            window.dispatchEvent(new Event('storage'));
+            // Dispatch custom event
+            window.dispatchEvent(new Event('auth-change'));
             
-            // Navigate to dashboard after authentication
+            // Then navigate after a delay
             setTimeout(() => {
                 navigate('/dashboard');
             }, 100);

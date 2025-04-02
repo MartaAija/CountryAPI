@@ -6,37 +6,34 @@ import '../../App.css';
 function Navbar() {
     // Get current location to highlight active navigation link
     const location = useLocation();
-    // Track if user is logged in
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
-    // Track if user has admin privileges
-    const [isAdmin, setIsAdmin] = useState(false);
+    // Use state to track authentication status
+    const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
+    const [isAdmin, setIsAdmin] = useState(localStorage.getItem('isAdmin') === 'true');
 
+    // Effect to listen for auth state changes
     useEffect(() => {
-        // Function to check auth status from localStorage
-        const checkAuthStatus = () => {
+        // Function to update auth state from localStorage
+        const updateAuthState = () => {
             const token = localStorage.getItem('token');
             const adminStatus = localStorage.getItem('isAdmin') === 'true';
+            
             setIsAuthenticated(!!token);
             setIsAdmin(adminStatus);
         };
 
-        // Check initial status when component mounts
-        checkAuthStatus();
-
-        // Listen for auth changes through localStorage events
-        const handleStorageChange = () => {
-            checkAuthStatus();
-        };
-
-        // Add event listeners for both standard storage events and custom authChange events
-        window.addEventListener('storage', handleStorageChange);
-        // Custom event listener for direct auth status updates from Login/Logout components
-        window.addEventListener('authChange', handleStorageChange);
-
-        // Clean up event listeners on component unmount
+        // Initial check
+        updateAuthState();
+        
+        // Listen for storage events (when localStorage changes)
+        window.addEventListener('storage', updateAuthState);
+        
+        // Custom event listener for auth changes
+        const handleAuthChange = () => updateAuthState();
+        window.addEventListener('auth-change', handleAuthChange);
+        
         return () => {
-            window.removeEventListener('storage', handleStorageChange);
-            window.removeEventListener('authChange', handleStorageChange);
+            window.removeEventListener('storage', updateAuthState);
+            window.removeEventListener('auth-change', handleAuthChange);
         };
     }, []);
 
