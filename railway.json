@@ -2,10 +2,12 @@
   "schema": "v2",
   "build": {
     "builder": "nixpacks",
-    "buildCommand": "echo 'Selecting service to build'"
+    "buildCommand": "cd secure-api-middleware && npm install"
   },
   "deploy": {
     "numReplicas": 1,
-    "startCommand": "echo 'Please use subfolders directly'"
+    "startCommand": "cd secure-api-middleware && npm start",
+    "healthcheckPath": "/",
+    "healthcheckTimeout": 300
   }
 }
