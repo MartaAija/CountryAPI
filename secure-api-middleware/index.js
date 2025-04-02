@@ -21,7 +21,7 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
 app.use(cors({
   origin: [
     'http://localhost:3000',
-    'https://martaaija.github.io'
+    'https://your-netlify-app-name.netlify.app' // Your Netlify domain
   ],
   credentials: true
 }));
