@@ -19,10 +19,7 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
 
 //CORS configuration to allow requests from Railway
 app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'https://your-netlify-app-name.netlify.app' // Your Netlify domain
-  ],
+  origin: allowedOrigins,
   credentials: true
 }));
 
@@ -83,7 +80,7 @@ app.use((err, req, res, next) => {
 // Start the server with a small delay to allow database initialization
 const PORT = process.env.PORT || 5000;
 setTimeout(() => {
-  app.listen(PORT, '0.0.0.0', () => {
+  app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
   });
 }, 5000); // 5 second delay to give database initialization time to complete 
