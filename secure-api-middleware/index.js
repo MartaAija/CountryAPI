@@ -7,6 +7,7 @@ const cors = require('cors');
 const authRoutes = require('./routes/authRoutes');
 const countryRoutes = require('./routes/countryRoutes');
 require('dotenv').config();  // Load environment variables from .env file
+const pool = require('./config/db');
 
 // Initialize Express application
 const app = express();
@@ -32,6 +33,29 @@ app.use('/api/countries', countryRoutes);  // Country data routes mounted at /ap
 // Basic root route for service health check
 app.get('/', (req, res) => {
     res.send('Secure API Middleware is running...');
+});
+
+// Add a simple health check endpoint
+app.get('/health', async (req, res) => {
+  try {
+    // Check database connection
+    const [result] = await pool.query('SELECT 1 as test');
+    
+    // List tables
+    const [tables] = await pool.query('SHOW TABLES');
+    
+    res.json({
+      status: 'ok',
+      database: 'connected',
+      tables: tables.map(row => Object.values(row)[0]),
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
 });
 
 // Add proper error handling middleware

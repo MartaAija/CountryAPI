@@ -5,32 +5,26 @@
 const mysql = require("mysql2/promise");
 require("dotenv").config();
 
-// Detailed logging for debugging
-console.log("=== DATABASE INITIALIZATION ===");
-console.log("DATABASE_URL available:", !!process.env.DATABASE_URL);
-console.log("PORT:", process.env.PORT);
+console.log("Starting database connection setup");
 
-// Create connection pool using DATABASE_URL only
-let pool;
+// Simple connection parameters - use DATABASE_URL directly
+const connectionUrl = process.env.DATABASE_URL;
+console.log("Connection URL available:", !!connectionUrl);
 
-try {
-  pool = mysql.createPool(process.env.DATABASE_URL);
-  console.log("Pool created successfully");
-} catch (error) {
-  console.error("Error creating connection pool:", error);
-  process.exit(1); // Exit if we can't even create the pool
-}
+// Create connection pool
+const pool = mysql.createPool(connectionUrl);
 
-// Initialize database with tables
+// Function to initialize database tables
 async function initializeDatabase() {
+  let connection;
   try {
-    console.log("Testing database connection...");
-    const [result] = await pool.query("SELECT 1 as test");
-    console.log("Database connection successful:", result);
+    console.log("Getting connection from pool...");
+    connection = await pool.getConnection();
+    console.log("Connection successful!");
 
     // Create users table
-    console.log("Creating users table if not exists...");
-    await pool.query(`
+    console.log("Creating users table...");
+    await connection.query(`
       CREATE TABLE IF NOT EXISTS users (
         id INT AUTO_INCREMENT PRIMARY KEY,
         username VARCHAR(255) NOT NULL UNIQUE,
@@ -48,11 +42,11 @@ async function initializeDatabase() {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    console.log("Users table created/verified");
+    console.log("Users table created successfully");
 
     // Create api_key_usage table
-    console.log("Creating api_key_usage table if not exists...");
-    await pool.query(`
+    console.log("Creating api_key_usage table...");
+    await connection.query(`
       CREATE TABLE IF NOT EXISTS api_key_usage (
         id INT AUTO_INCREMENT PRIMARY KEY,
         api_key VARCHAR(255) NOT NULL,
@@ -60,27 +54,31 @@ async function initializeDatabase() {
         used_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    console.log("API key usage table created/verified");
+    console.log("API key usage table created successfully");
 
-    console.log("Database initialization complete!");
-    
-    // Verify tables exist by querying information_schema
-    const [tables] = await pool.query(`
-      SELECT TABLE_NAME FROM information_schema.TABLES 
-      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('users', 'api_key_usage')
+    // List all tables for verification
+    const [rows] = await connection.query(`
+      SHOW TABLES
     `);
-    console.log("Verified tables:", tables.map(t => t.TABLE_NAME));
-    
+    console.log("Current tables in database:", rows.map(row => Object.values(row)[0]));
+
   } catch (error) {
-    console.error("DATABASE INITIALIZATION ERROR:");
-    console.error(error.message);
-    console.error(error.stack);
-    // Don't exit - let the server try to start anyway
+    console.error("Database initialization error:", error.message);
+    console.error("Error stack:", error.stack);
+  } finally {
+    if (connection) {
+      console.log("Releasing database connection");
+      connection.release();
+    }
   }
 }
 
-// Run initialization immediately
-initializeDatabase();
+// Initialize database on startup
+console.log("Initializing database...");
+initializeDatabase().then(() => {
+  console.log("Database initialization complete");
+}).catch(err => {
+  console.error("Fatal database initialization error:", err);
+});
 
-// Export pool for other modules to use
 module.exports = pool; 
