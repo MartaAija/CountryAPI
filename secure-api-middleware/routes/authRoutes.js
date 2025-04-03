@@ -10,6 +10,7 @@ const authenticate = require("../middleware/authenticate");
 // Public routes (no authentication required)
 router.post("/signup", authController.registerUser);      // Register new account
 router.post("/login", authController.loginUser);          // Authenticate user
+router.post("/forgot-password", authController.forgotPassword); // Reset password
 
 // Protected routes (require valid JWT)
 router.get("/profile", authenticate, authController.getUserProfile);           // Get user profile

@@ -103,6 +103,9 @@ function Login() {
                 <p className="text-center admin-link">
                     <Link to="/admin-login" className="text-secondary">Are you an admin?</Link>
                 </p>
+                <p className="text-center">
+                    <Link to="/forgot-password" className="text-secondary">Forgot your password?</Link>
+                </p>
             </div>
         </div>
     );

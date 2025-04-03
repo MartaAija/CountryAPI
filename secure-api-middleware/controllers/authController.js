@@ -518,6 +518,38 @@ async function adminDeleteUser(req, res) {
     }
 }
 
+// Forgot Password
+async function forgotPassword(req, res) {
+    try {
+        const { username, newPassword } = req.body;
+        
+        if (!username || !newPassword) {
+            return res.status(400).json({ error: "Username and new password are required" });
+        }
+        
+        // Find user by username
+        const [user] = await db.query("SELECT id FROM users WHERE username = ?", [username]);
+        
+        if (user.length === 0) {
+            return res.status(404).json({ error: "User not found" });
+        }
+        
+        // Hash the new password
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        
+        // Update the password
+        await db.query(
+            "UPDATE users SET password_hash = ? WHERE id = ?",
+            [hashedPassword, user[0].id]
+        );
+        
+        res.json({ message: "Password reset successfully. Please login with your new password." });
+    } catch (err) {
+        console.error("Password reset error:", err);
+        res.status(500).json({ error: "Failed to reset password" });
+    }
+}
+
 module.exports = {
     registerUser,
     loginUser,
@@ -532,5 +564,6 @@ module.exports = {
     getAllUsers,
     adminToggleApiKey,
     adminDeleteApiKey,
-    adminDeleteUser
+    adminDeleteUser,
+    forgotPassword
 }; 
