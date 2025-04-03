@@ -78,62 +78,69 @@ function ForgotPassword() {
             <div className="form-container">
                 <div className="page-header">
                     <h2 className="page-title">Reset Password</h2>
-                    <p className="page-subtitle">Enter your username and new password</p>
+                    {!success && (
+                        <p className="page-subtitle">Enter your username and new password</p>
+                    )}
                 </div>
 
                 {error && <div className="message error-message">{error}</div>}
                 {message && <div className="message success-message">{message}</div>}
 
                 {!success ? (
-                    <form onSubmit={handleSubmit} className="form-group">
-                        <input 
-                            type="text" 
-                            placeholder="Username" 
-                            value={username}
-                            onChange={(e) => setUsername(e.target.value)} 
-                            required 
-                        />
-                        
-                        <div className="password-input-container">
+                    <>
+                        <form onSubmit={handleSubmit} className="form-group">
                             <input 
-                                type="password" 
-                                placeholder="New Password" 
-                                value={newPassword}
-                                onChange={handlePasswordChange} 
+                                type="text" 
+                                placeholder="Username" 
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value)} 
                                 required 
                             />
-                            {passwordErrors.length > 0 && (
-                                <div className="password-requirements">
-                                    {passwordErrors.map((error, index) => (
-                                        <p key={index} className="requirement-item" style={{ color: 'var(--warning-color)', fontSize: '0.9rem', margin: '0.2rem 0' }}>
-                                            ⚠️ {error}
-                                        </p>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                        
-                        <input 
-                            type="password" 
-                            placeholder="Confirm Password" 
-                            value={confirmPassword}
-                            onChange={(e) => setConfirmPassword(e.target.value)} 
-                            required 
-                        />
-                        
-                        <button type="submit">Reset Password</button>
-                    </form>
+                            
+                            <div className="password-input-container">
+                                <input 
+                                    type="password" 
+                                    placeholder="New Password" 
+                                    value={newPassword}
+                                    onChange={handlePasswordChange} 
+                                    required 
+                                />
+                                {passwordErrors.length > 0 && (
+                                    <div className="password-requirements">
+                                        {passwordErrors.map((error, index) => (
+                                            <p key={index} className="requirement-item" style={{ color: 'var(--warning-color)', fontSize: '0.9rem', margin: '0.2rem 0' }}>
+                                                ⚠️ {error}
+                                            </p>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            
+                            <input 
+                                type="password" 
+                                placeholder="Confirm Password" 
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)} 
+                                required 
+                            />
+                            
+                            <button type="submit">Reset Password</button>
+                        </form>
+                        <p className="text-center">
+                            <Link to="/login" className="text-primary">Back to Login</Link>
+                        </p>
+                    </>
                 ) : (
-                    <div className="success-actions">
-                        <button onClick={handleLogin} className="btn-primary">
-                            Go to Login
+                    <div className="success-actions" style={{ textAlign: 'center' }}>
+                        <button 
+                            onClick={handleLogin} 
+                            className="btn-primary"
+                            style={{ margin: '20px auto', display: 'block' }}
+                        >
+                            GO TO LOGIN
                         </button>
                     </div>
                 )}
-
-                <p className="text-center">
-                    <Link to="/login" className="text-primary">Back to Login</Link>
-                </p>
             </div>
         </div>
     );
