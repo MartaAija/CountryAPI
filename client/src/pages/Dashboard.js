@@ -1,6 +1,6 @@
 // Dashboard component provides a search interface for users to access and filter country data
 // Uses the active API key to fetch country information through the secure middleware
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import '../App.css';
 import config from '../config';
@@ -42,9 +42,27 @@ function Dashboard() {
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
+    // Fetch all countries using the provided API key - converted to useCallback
+    const fetchAllCountries = useCallback(async (apiKey) => {
+        setLoading(true);
+        setError('');
+        try {
+            const response = await axios.get(`${config.apiBaseUrl}/api/countries/all`, {
+                headers: { 
+                    'X-API-Key': apiKey
+                }
+            });
+            const sortedData = sortCountries(response.data, sortOrder);
+            setCountryData(sortedData);
+            setFilteredData(sortedData);
+        } catch (error) {
+            handleApiError(error);
+        } finally {
+            setLoading(false);
+        }
+    }, [sortOrder]);
+
     // Fetch user's API key and initial country data on component mount
-    // Note: This effect has a missing dependency 'fetchAllCountries' which should be added
-    // or the function should be defined inside the effect
     useEffect(() => {
         const fetchApiKey = async () => {
             try {
@@ -68,7 +86,7 @@ function Dashboard() {
         };
 
         fetchApiKey();
-    }, []);
+    }, [fetchAllCountries]);
 
     // Update search suggestions based on current search query and mode
     useEffect(() => {
@@ -110,26 +128,6 @@ function Dashboard() {
             setShowSuggestions(false);
         }
     }, [searchQuery, countryData, searchMode]);
-
-    // Fetch all countries using the provided API key
-    const fetchAllCountries = async (apiKey) => {
-        setLoading(true);
-        setError('');
-        try {
-            const response = await axios.get(`${config.apiBaseUrl}/api/countries/all`, {
-                headers: { 
-                    'X-API-Key': apiKey
-                }
-            });
-            const sortedData = sortCountries(response.data, sortOrder);
-            setCountryData(sortedData);
-            setFilteredData(sortedData);
-        } catch (error) {
-            handleApiError(error);
-        } finally {
-            setLoading(false);
-        }
-    };
 
     // Sort countries alphabetically by name in ascending or descending order
     const sortCountries = (countries, order) => {
@@ -385,7 +383,7 @@ function Dashboard() {
             {/* Search message for user guidance */}
             {error && <div className="message search-message"> Start searching with your API Key...🔍</div>}
 
-            {/* Loading indicator */}
+            {/* Loading indicator - fix the conditional rendering */}
             {loading && (
                 <div className="loading-spinner">
                     <p>Loading countries...</p>
