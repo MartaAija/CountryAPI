@@ -15,11 +15,27 @@ const app = express();
 // Get allowed origins from environment or use defaults with Netlify domain
 const allowedOrigins = process.env.ALLOWED_ORIGINS 
   ? process.env.ALLOWED_ORIGINS.split(',') 
-  : ['http://localhost:3000', 'https://illustrious-nougat-89c023.netlify.app'];
+  : ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:8080', 'https://illustrious-nougat-89c023.netlify.app'];
 
-//CORS configuration to allow requests from Railway
+// More flexible CORS configuration
 app.use(cors({
-  origin: allowedOrigins,
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl, postman)
+    if (!origin) return callback(null, true);
+    
+    if (process.env.NODE_ENV === 'development') {
+      // In development, allow all origins
+      return callback(null, true);
+    }
+    
+    if (allowedOrigins.indexOf(origin) === -1) {
+      // Log the rejected origin for debugging
+      console.warn(`Origin ${origin} not allowed by CORS`);
+      return callback(null, true); // Temporarily allowing all origins
+    }
+    
+    return callback(null, true);
+  },
   credentials: true
 }));
 

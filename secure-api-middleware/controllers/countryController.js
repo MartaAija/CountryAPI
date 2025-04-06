@@ -41,6 +41,7 @@ const processCountryData = (country) => {
             flag: country.flags.png
         };
     } catch (error) {
+        console.error('Error processing country data:', error);
         // Return null for invalid countries
         return null;
     }
@@ -56,6 +57,7 @@ const processCountryData = (country) => {
 const fetchCountriesWithRetry = async (retries = 3) => {
     for (let i = 0; i < retries; i++) {
         try {
+            console.log(`Attempt ${i+1} to fetch country data from external API`);
             // Request to external API with timeout and headers
             const response = await axios.get('https://restcountries.com/v3.1/all', {
                 timeout: 5000, // 5 second timeout prevents hanging requests
@@ -63,8 +65,10 @@ const fetchCountriesWithRetry = async (retries = 3) => {
                     'Accept': 'application/json'
                 }
             });
+            console.log(`Successfully fetched ${response.data.length} countries from external API`);
             return response.data;
         } catch (error) {
+            console.error(`Error on attempt ${i+1}:`, error.message);
             
             // If we've reached the maximum retries, throw the error
             if (i === retries - 1) throw error;
@@ -84,11 +88,35 @@ const fetchCountriesWithRetry = async (retries = 3) => {
  * @param {Object} res - Express response object
  */
 async function getAllCountries(req, res) {
+    console.log('getAllCountries API call received');
+    
+    // FOR TESTING: If the external API is down, use this mock data
+    if (process.env.USE_MOCK_DATA === 'true') {
+        console.log('Using mock country data');
+        return res.json([
+            {
+                name: "United States",
+                capital: "Washington, D.C.",
+                currency: { code: "USD", name: "United States dollar", symbol: "$" },
+                languages: ["English"],
+                flag: "https://flagcdn.com/w320/us.png"
+            },
+            {
+                name: "United Kingdom",
+                capital: "London",
+                currency: { code: "GBP", name: "British pound", symbol: "£" },
+                languages: ["English"],
+                flag: "https://flagcdn.com/w320/gb.png"
+            }
+        ]);
+    }
+    
     try {
         // Fetch countries with retry mechanism for reliability
         const countriesData = await fetchCountriesWithRetry();
         
         // Process and filter the data to ensure consistent format
+        console.log('Processing country data...');
         // This maps each country through the processor and filters out any null results
         const processedData = countriesData
             .map(processCountryData)
@@ -96,16 +124,28 @@ async function getAllCountries(req, res) {
 
         // Verify we have valid data to return
         if (processedData.length === 0) {
+            console.error('No valid country data received from external API');
             throw new Error('No valid country data received');
         }
 
+        console.log(`Returning ${processedData.length} processed countries`);
         // Return processed data as JSON
         res.json(processedData);
     } catch (error) {
+        console.error('Error in getAllCountries:', error);
+        // Log additional details about the error
+        if (error.response) {
+            console.error('Error response status:', error.response.status);
+            console.error('Error response data:', error.response.data);
+        } else if (error.request) {
+            console.error('No response received from external API');
+        }
+        
         // Detailed user-friendly error message
         res.status(500).json({ 
             error: 'Failed to fetch countries',
-            message: 'The external API is currently unavailable. Please try again later.'
+            message: 'The external API is currently unavailable. Please try again later.',
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }
 }
@@ -142,10 +182,12 @@ async function searchCountries(req, res) {
         if (error.response?.status === 404) {
             res.json([]); // Return empty array for no results (better UX than an error)
         } else {
+            console.error('Error in searchCountries:', error);
             // General error handling
             res.status(500).json({ 
                 error: 'Failed to search countries',
-                message: 'The external API is currently unavailable. Please try again later.'
+                message: 'The external API is currently unavailable. Please try again later.',
+                details: process.env.NODE_ENV === 'development' ? error.message : undefined
             });
         }
     }
