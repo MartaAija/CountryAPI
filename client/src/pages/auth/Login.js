@@ -101,10 +101,10 @@ function Login() {
                     Don't have an account? <Link to="/register" className="text-primary">Register here</Link>
                 </p>
                 <p className="text-center admin-link">
-                    <Link to="/admin-login" className="text-secondary">Are you an admin?</Link>
+                Are you an admin? <Link to="/admin-login" className="text-secondary">Click here</Link>
                 </p>
                 <p className="text-center">
-                    <Link to="/forgot-password" className="text-secondary">Forgot your password?</Link>
+                  Forgot your password? <Link to="/forgot-password" className="text-secondary">Click here</Link>
                 </p>
             </div>
         </div>
