@@ -55,16 +55,35 @@ const processCountryData = (country) => {
  * @returns {Promise<Array>} - Array of country data from external API
  */
 const fetchCountriesWithRetry = async (retries = 3) => {
+    // Configure axios with longer timeout and keep-alive
+    const axiosInstance = axios.create({
+        timeout: 15000, // Increased timeout to 15 seconds
+        headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'CountryAPI/1.0',
+            'Connection': 'keep-alive'
+        },
+        // Add proxy configuration if needed to bypass network restrictions
+        // proxy: {
+        //   host: process.env.PROXY_HOST,
+        //   port: process.env.PROXY_PORT
+        // }
+    });
+
     for (let i = 0; i < retries; i++) {
         try {
             console.log(`Attempt ${i+1} to fetch country data from external API`);
-            // Request to external API with timeout and headers
-            const response = await axios.get('https://restcountries.com/v3.1/all', {
-                timeout: 5000, // 5 second timeout prevents hanging requests
-                headers: {
-                    'Accept': 'application/json'
-                }
-            });
+            // Try multiple alternative URLs in case one is blocked
+            let response;
+            try {
+                // Primary URL
+                response = await axiosInstance.get('https://restcountries.com/v3.1/all');
+            } catch (primaryError) {
+                console.error(`Primary URL failed: ${primaryError.message}, trying alternative...`);
+                // Alternative URL (sometimes helps bypass network restrictions)
+                response = await axiosInstance.get('https://restcountries.com/v3.1/all?fields=name,capital,currencies,languages,flags');
+            }
+            
             console.log(`Successfully fetched ${response.data.length} countries from external API`);
             return response.data;
         } catch (error) {
@@ -74,8 +93,8 @@ const fetchCountriesWithRetry = async (retries = 3) => {
             if (i === retries - 1) throw error;
             
             // Exponential backoff: wait longer between each retry
-            // 1st retry: 1 second, 2nd retry: 2 seconds, 3rd retry: 3 seconds
-            await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+            // 1st retry: 1 second, 2nd retry: 2 seconds, 3rd retry: 4 seconds
+            await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, i)));
         }
     }
 };
@@ -89,27 +108,6 @@ const fetchCountriesWithRetry = async (retries = 3) => {
  */
 async function getAllCountries(req, res) {
     console.log('getAllCountries API call received');
-    
-    // FOR TESTING: If the external API is down, use this mock data
-    if (process.env.USE_MOCK_DATA === 'true') {
-        console.log('Using mock country data');
-        return res.json([
-            {
-                name: "United States",
-                capital: "Washington, D.C.",
-                currency: { code: "USD", name: "United States dollar", symbol: "$" },
-                languages: ["English"],
-                flag: "https://flagcdn.com/w320/us.png"
-            },
-            {
-                name: "United Kingdom",
-                capital: "London",
-                currency: { code: "GBP", name: "British pound", symbol: "£" },
-                languages: ["English"],
-                flag: "https://flagcdn.com/w320/gb.png"
-            }
-        ]);
-    }
     
     try {
         // Fetch countries with retry mechanism for reliability
@@ -144,8 +142,7 @@ async function getAllCountries(req, res) {
         // Detailed user-friendly error message
         res.status(500).json({ 
             error: 'Failed to fetch countries',
-            message: 'The external API is currently unavailable. Please try again later.',
-            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+            message: 'The external API is currently unavailable. Please try again later.'
         });
     }
 }
@@ -162,32 +159,28 @@ async function searchCountries(req, res) {
         // Extract search query from request parameters
         const { query } = req.params;
         
-        // Request specific countries from external API based on search term
-        const response = await axios.get(`https://restcountries.com/v3.1/name/${query}`, {
-            timeout: 5000,
-            headers: {
-                'Accept': 'application/json'
-            }
-        });
-        
-        // Process and filter data for consistency
-        const processedData = response.data
+        // Get all countries and filter them locally instead of making another API call
+        // This is more reliable when the external API might have connection issues
+        const allCountries = await fetchCountriesWithRetry();
+        const processedData = allCountries
             .map(processCountryData)
-            .filter(country => country !== null);
-            
-        // Return processed data as JSON
+            .filter(country => country !== null)
+            .filter(country => 
+                country.name.toLowerCase().includes(query.toLowerCase())
+            );
+        
+        // Return filtered data as JSON
         res.json(processedData);
     } catch (error) {
+        console.error('Error in searchCountries:', error);
         // Special handling for "not found" responses
         if (error.response?.status === 404) {
             res.json([]); // Return empty array for no results (better UX than an error)
         } else {
-            console.error('Error in searchCountries:', error);
             // General error handling
             res.status(500).json({ 
                 error: 'Failed to search countries',
-                message: 'The external API is currently unavailable. Please try again later.',
-                details: process.env.NODE_ENV === 'development' ? error.message : undefined
+                message: 'The external API is currently unavailable. Please try again later.'
             });
         }
     }
