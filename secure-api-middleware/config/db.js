@@ -62,10 +62,8 @@ const initializeDatabase = async (retries = 10, delay = 5000) => {
       }
       
       if (attempt < retries) {
-        console.log(`Will retry in ${delay/1000} seconds... (${retries - attempt} retries remaining)`);
         await new Promise(resolve => setTimeout(resolve, delay));
       } else {
-        console.log(`Failed to initialize database after ${retries} attempts.`);
         // Don't throw error - let app start anyway but it will likely fail on DB operations
       }
     }

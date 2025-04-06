@@ -53,7 +53,6 @@ function Admin() {
     // Delete an API key for a user
     const handleDeleteApiKey = async (userId, keyType) => {
         try {
-            console.log(`Admin attempting to delete ${keyType} API key for user ${userId}`);
             
             // Use query parameters instead of request body for DELETE
             const response = await axios({
@@ -66,7 +65,6 @@ function Admin() {
                 params: { keyType }
             });
             
-            console.log("Admin API key deletion response:", response.data);
             
             if (response.data.success) {
                 setMessage(`${keyType} API key deleted successfully`);
@@ -75,7 +73,6 @@ function Admin() {
                 throw new Error("API responded but deletion may have failed");
             }
         } catch (error) {
-            console.error("Admin delete API key error:", error);
             setMessage('Failed to delete API key: ' + (error.response?.data?.error || error.message));
             // Even if there's an error response, the key might have been deleted
             // so refresh the data anyway

@@ -311,8 +311,6 @@ async function deleteApiKey(req, res) {
         // Check for keyType in both query params and request body
         const keyType = req.query.keyType || (req.body ? req.body.keyType : null);
 
-        console.log("Delete API Key request:", { userId, keyType, query: req.query, body: req.body });
-
         if (!keyType) {
             return res.status(400).json({ error: "Key type is required" });
         }
@@ -341,7 +339,6 @@ async function deleteApiKey(req, res) {
 
         res.json({ message: `${keyType} API key deleted successfully`, success: true });
     } catch (err) {
-        console.error("API key deletion error:", err);
         res.status(500).json({ error: "Failed to delete API key: " + err.message });
     }
 }
@@ -470,8 +467,6 @@ async function adminDeleteApiKey(req, res) {
         // Check for keyType in both query params and request body
         const keyType = req.query.keyType || (req.body ? req.body.keyType : null);
         
-        console.log("Admin Delete API Key request:", { userId, keyType, query: req.query, body: req.body });
-        
         if (!keyType) {
             return res.status(400).json({ error: "Key type is required" });
         }
@@ -500,7 +495,6 @@ async function adminDeleteApiKey(req, res) {
 
         res.json({ message: "API key deleted successfully", success: true });
     } catch (error) {
-        console.error("Admin API key deletion error:", error);
         res.status(500).json({ error: "Failed to delete API key: " + error.message });
     }
 }
@@ -545,7 +539,6 @@ async function forgotPassword(req, res) {
         
         res.json({ message: "Password reset successfully. Please login with your new password." });
     } catch (err) {
-        console.error("Password reset error:", err);
         res.status(500).json({ error: "Failed to reset password" });
     }
 }

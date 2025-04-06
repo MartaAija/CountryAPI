@@ -13,14 +13,18 @@ import ForgotPassword from './pages/auth/ForgotPassword';
 import './App.css';
 
 function App() {
+  // Check if user is authenticated by looking for a token in localStorage
   const isAuthenticated = () => {
     return !!localStorage.getItem('token');
   };
 
+  // Check if user has admin privileges
   const isAdmin = () => {
     return !!localStorage.getItem('isAdmin');
   };
 
+  // Custom component for protected routes that redirects unauthenticated users to login
+  // Takes an optional adminRequired parameter to restrict routes to admin users only
   const PrivateRoute = ({ children, adminRequired = false }) => {
     if (adminRequired) {
       return isAdmin() ? children : <Navigate to="/login" />;
@@ -33,6 +37,7 @@ function App() {
       <Navbar />
       <main className="main-container">
         <Routes>
+          {/* Public routes accessible to all users */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/home" element={<Home />} />
@@ -40,7 +45,7 @@ function App() {
           <Route path="/logout" element={<Logout />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           
-          {/* Protected Routes */}
+          {/* Protected Routes - require authentication */}
           <Route path="/dashboard" element={
             <PrivateRoute>
               <Dashboard />
@@ -52,7 +57,7 @@ function App() {
             </PrivateRoute>
           } />
           
-          {/* Admin Routes */}
+          {/* Admin Routes - require admin privileges */}
           <Route path="/admin" element={
             <PrivateRoute adminRequired={true}>
               <Admin />

@@ -73,7 +73,6 @@ app.get('/health', async (req, res) => {
 
 // Add proper error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
   res.status(500).json({ error: 'Something went wrong!' });
 });
 
@@ -81,6 +80,5 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 setTimeout(() => {
   app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
   });
 }, 5000); // 5 second delay to give database initialization time to complete 

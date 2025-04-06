@@ -184,7 +184,6 @@ function Settings() {
                 return;
             }
             
-            console.log(`Attempting to delete ${keyType} API key for user ${userDetails.id}`);
             
             // First try with query parameters
             const response = await axios({
@@ -197,8 +196,7 @@ function Settings() {
                 params: { keyType }
             });
             
-            console.log("API key deletion response:", response.data);
-            
+
             if (response.data.success) {
                 setMessage(`${keyType} API key deleted successfully`);
                 // Update local state before fetching new data
@@ -214,7 +212,6 @@ function Settings() {
                 throw new Error("API responded but deletion may have failed");
             }
         } catch (error) {
-            console.error("Delete API key error:", error);
             setMessage(error.response?.data?.error || "Failed to delete API key");
             // Even if there's an error response, the key might have been deleted
             // so refresh the data anyway
