@@ -52,7 +52,8 @@ function Dashboard() {
                     'X-API-Key': apiKey
                 }
             });
-            const sortedData = sortCountries(response.data, sortOrder);
+            // Sort data in the current ascending order - this won't change based on sortOrder
+            const sortedData = [...response.data].sort((a, b) => a.name.localeCompare(b.name));
             setCountryData(sortedData);
             setFilteredData(sortedData);
         } catch (error) {
@@ -60,7 +61,7 @@ function Dashboard() {
         } finally {
             setLoading(false);
         }
-    }, [sortOrder]);
+    }, []);
 
     // Fetch user's API key and initial country data on component mount
     useEffect(() => {
@@ -138,26 +139,36 @@ function Dashboard() {
         });
     };
 
-    // Completely standalone sort function that doesn't interact with search
-    const performSort = () => {
-        // Toggle sort order
-        const newOrder = sortOrder === 'asc' ? 'desc' : 'asc';
-        setSortOrder(newOrder);
+    // Brand new sort function that doesn't interact with search
+    const handleSort = () => {
+        // Here we'll use a custom approach to prevent any side effects
+        if (!filteredData || filteredData.length === 0) {
+            return;
+        }
         
-        // Sort only if we have data
-        if (filteredData && filteredData.length > 0) {
-            // Create a new copy to avoid mutations
-            const dataCopy = [...filteredData];
+        try {
+            // 1. Toggle the sort order locally to avoid state change triggers
+            const newSortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
             
-            // Sort the data copy
-            dataCopy.sort((a, b) => {
-                return newOrder === 'asc' 
-                    ? a.name.localeCompare(b.name)
-                    : b.name.localeCompare(a.name);
+            // 2. Create a completely new copy of the current filtered data
+            const dataToSort = JSON.parse(JSON.stringify(filteredData));
+            
+            // 3. Sort the data using a direct array sort to avoid complex logic
+            dataToSort.sort((a, b) => {
+                if (newSortOrder === 'asc') {
+                    return a.name.localeCompare(b.name);
+                } else {
+                    return b.name.localeCompare(a.name);
+                }
             });
             
-            // Update the state with sorted data
-            setFilteredData(dataCopy);
+            // 4. First set the sorted data
+            setFilteredData(dataToSort);
+            
+            // 5. Then update the sort order in a separate operation
+            setSortOrder(newSortOrder);
+        } catch (error) {
+            console.error("Error during sorting:", error);
         }
     };
 
@@ -211,60 +222,6 @@ function Dashboard() {
         }
     };
 
-    // Handle search form submission
-    const handleSearch = async () => {
-        if (!searchQuery.trim()) {
-            setFilteredData(countryData);
-            return;
-        }
-        if (!userApiKey) {
-            setError('No active API key found. Please generate an API key in Settings.');
-            return;
-        }
-
-        setLoading(true);
-        setError('');
-
-        try {
-            const query = searchQuery.toLowerCase().trim();
-            let filteredResults = [];
-
-            // Filter results based on search mode and query
-            switch(searchMode) {
-                case 'currency':
-                    filteredResults = countryData.filter(country => {
-                        const currencyName = country.currency?.name?.toLowerCase() || '';
-                        const currencyCode = country.currency?.code?.toLowerCase() || '';
-                        const currencySymbol = country.currency?.symbol?.toLowerCase() || '';
-                        return currencyName.includes(query) || 
-                               currencyCode.includes(query) || 
-                               currencySymbol.includes(query);
-                    });
-                    break;
-                case 'language':
-                    filteredResults = countryData.filter(country => 
-                        country.languages.some(lang => 
-                            lang.toLowerCase().includes(query)
-                        )
-                    );
-                    break;
-                default: // country name search
-                    filteredResults = countryData.filter(country => 
-                        country.name.toLowerCase().includes(query)
-                    );
-                    break;
-            }
-
-            // Sort the filtered results
-            const sortedData = sortCountries(filteredResults, sortOrder);
-            setFilteredData(sortedData);
-        } catch (error) {
-            handleApiError(error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
     // Scroll to top of page - used by back-to-top button
     const scrollToTop = () => {
         window.scrollTo({
@@ -308,46 +265,143 @@ function Dashboard() {
                     </button>
                 </div>
 
-                {/* Search input with suggestions dropdown - No form wrapper */}
-                <div className="search-container" ref={searchContainerRef}>
-                    <div className="search-input-container" style={{ width: '100%', marginBottom: '15px' }}>
-                        <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder={getPlaceholderText()}
-                            className="search-input"
-                            disabled={!userApiKey}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    handleSearch();
-                                }
-                            }}
-                        />
-                    </div>
-                    
-                    {/* Buttons row - completely separate from any form */}
-                    <div className="button-row" style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
-                        <button 
-                            type="button"
-                            onClick={() => handleSearch()}
-                            disabled={loading || !userApiKey}
-                        >
-                            {loading ? 'Searching...' : 'Search'}
-                        </button>
-                    </div>
-                    
-                    {/* Completely isolated Sort button */}
-                    {filteredData && (
-                        <div style={{ marginBottom: '15px' }}>
+                {/* Search input and button - completely separate from sorting */}
+                <div style={{ marginBottom: '20px' }}>
+                    <div className="search-container" ref={searchContainerRef}>
+                        <div className="search-input-container" style={{ width: '100%', marginBottom: '15px' }}>
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder={getPlaceholderText()}
+                                className="search-input"
+                                disabled={!userApiKey}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        
+                                        // Directly implement search here to match the button
+                                        if (!searchQuery.trim()) {
+                                            setFilteredData(countryData);
+                                            return;
+                                        }
+                                        if (!userApiKey) {
+                                            setError('No active API key found. Please generate an API key in Settings.');
+                                            return;
+                                        }
+                                        
+                                        setLoading(true);
+                                        setError('');
+                                        
+                                        try {
+                                            const query = searchQuery.toLowerCase().trim();
+                                            let results = [];
+                                            
+                                            // Filter based on search mode
+                                            if (searchMode === 'currency') {
+                                                results = countryData.filter(country => {
+                                                    const currencyName = country.currency?.name?.toLowerCase() || '';
+                                                    const currencyCode = country.currency?.code?.toLowerCase() || '';
+                                                    const currencySymbol = country.currency?.symbol?.toLowerCase() || '';
+                                                    return currencyName.includes(query) || 
+                                                           currencyCode.includes(query) || 
+                                                           currencySymbol.includes(query);
+                                                });
+                                            } else if (searchMode === 'language') {
+                                                results = countryData.filter(country => 
+                                                    country.languages.some(lang => 
+                                                        lang.toLowerCase().includes(query)
+                                                    )
+                                                );
+                                            } else {
+                                                results = countryData.filter(country => 
+                                                    country.name.toLowerCase().includes(query)
+                                                );
+                                            }
+                                            
+                                            // Sort the results in current order
+                                            results.sort((a, b) => {
+                                                return sortOrder === 'asc' 
+                                                    ? a.name.localeCompare(b.name)
+                                                    : b.name.localeCompare(a.name);
+                                            });
+                                            
+                                            setFilteredData(results);
+                                        } catch (err) {
+                                            console.error("Search error:", err);
+                                            setError('Failed to search countries');
+                                        } finally {
+                                            setLoading(false);
+                                        }
+                                    }
+                                }}
+                            />
+                        </div>
+                        
+                        {/* Search button only */}
+                        <div className="button-row" style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
                             <button 
-                                type="button" 
-                                className="btn-secondary"
-                                onClick={performSort}
-                                disabled={!filteredData}
+                                type="button"
+                                onClick={(e) => {
+                                    // Direct implementation to avoid any cross-function calls
+                                    e.stopPropagation(); // Stop any event bubbling
+                                    
+                                    if (!searchQuery.trim()) {
+                                        setFilteredData(countryData);
+                                        return;
+                                    }
+                                    if (!userApiKey) {
+                                        setError('No active API key found. Please generate an API key in Settings.');
+                                        return;
+                                    }
+                                    
+                                    setLoading(true);
+                                    setError('');
+                                    
+                                    try {
+                                        const query = searchQuery.toLowerCase().trim();
+                                        let results = [];
+                                        
+                                        // Filter based on search mode
+                                        if (searchMode === 'currency') {
+                                            results = countryData.filter(country => {
+                                                const currencyName = country.currency?.name?.toLowerCase() || '';
+                                                const currencyCode = country.currency?.code?.toLowerCase() || '';
+                                                const currencySymbol = country.currency?.symbol?.toLowerCase() || '';
+                                                return currencyName.includes(query) || 
+                                                       currencyCode.includes(query) || 
+                                                       currencySymbol.includes(query);
+                                            });
+                                        } else if (searchMode === 'language') {
+                                            results = countryData.filter(country => 
+                                                country.languages.some(lang => 
+                                                    lang.toLowerCase().includes(query)
+                                                )
+                                            );
+                                        } else {
+                                            results = countryData.filter(country => 
+                                                country.name.toLowerCase().includes(query)
+                                            );
+                                        }
+                                        
+                                        // Sort the results in current order
+                                        results.sort((a, b) => {
+                                            return sortOrder === 'asc' 
+                                                ? a.name.localeCompare(b.name)
+                                                : b.name.localeCompare(a.name);
+                                        });
+                                        
+                                        setFilteredData(results);
+                                    } catch (err) {
+                                        console.error("Search error:", err);
+                                        setError('Failed to search countries');
+                                    } finally {
+                                        setLoading(false);
+                                    }
+                                }}
+                                disabled={loading || !userApiKey}
                             >
-                                Sort {sortOrder === 'asc' ? '↓' : '↑'}
+                                {loading ? 'Searching...' : 'Search'}
                             </button>
                             
                             {(searchQuery || (filteredData && countryData && filteredData.length !== countryData.length)) && (
@@ -360,44 +414,61 @@ function Dashboard() {
                                     }}
                                     disabled={!userApiKey}
                                     className="btn-secondary"
-                                    style={{ marginLeft: '10px' }}
                                 >
                                     Show All
                                 </button>
                             )}
                         </div>
-                    )}
-                    
-                    {/* Search suggestions dropdown */}
-                    {showSuggestions && searchSuggestions.length > 0 && (
-                        <div className="search-suggestions">
-                            {searchSuggestions.map((country, index) => {
-                                let displayText = '';
-                                switch(searchMode) {
-                                    case 'currency':
-                                        displayText = `${country.name} (${country.currency?.name || 'N/A'} - ${country.currency?.code || 'N/A'})`;
-                                        break;
-                                    case 'language':
-                                        displayText = `${country.name} (${country.languages.join(', ')})`;
-                                        break;
-                                    default:
-                                        displayText = country.name;
-                                }
-                                return (
-                                    <div 
-                                        key={index}
-                                        className="suggestion-item"
-                                        onClick={() => handleCountrySelect(country)}
-                                    >
-                                        <img 
-                                            src={country.flag} 
-                                            alt="" 
-                                            className="suggestion-flag"
-                                        />
-                                        {displayText}
-                                    </div>
-                                );
-                            })}
+                        
+                        {/* Search suggestions dropdown */}
+                        {showSuggestions && searchSuggestions.length > 0 && (
+                            <div className="search-suggestions">
+                                {searchSuggestions.map((country, index) => {
+                                    let displayText = '';
+                                    switch(searchMode) {
+                                        case 'currency':
+                                            displayText = `${country.name} (${country.currency?.name || 'N/A'} - ${country.currency?.code || 'N/A'})`;
+                                            break;
+                                        case 'language':
+                                            displayText = `${country.name} (${country.languages.join(', ')})`;
+                                            break;
+                                        default:
+                                            displayText = country.name;
+                                    }
+                                    return (
+                                        <div 
+                                            key={index}
+                                            className="suggestion-item"
+                                            onClick={() => handleCountrySelect(country)}
+                                        >
+                                            <img 
+                                                src={country.flag} 
+                                                alt="" 
+                                                className="suggestion-flag"
+                                            />
+                                            {displayText}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                </div>
+                
+                {/* Completely separate sort control */}
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '15px', marginBottom: '20px' }}>
+                    {filteredData && filteredData.length > 0 && (
+                        <div>
+                            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
+                                <span style={{ marginRight: '10px' }}>Sort countries:</span>
+                                <button 
+                                    type="button" 
+                                    className="btn-secondary"
+                                    onClick={handleSort}  // Use the new handleSort function
+                                >
+                                    {sortOrder === 'asc' ? 'A to Z ↓' : 'Z to A ↑'}
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>
