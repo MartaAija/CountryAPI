@@ -313,18 +313,15 @@ function Dashboard() {
                             className="search-input"
                             disabled={!userApiKey}
                         />
-                        <div className="search-form-controls">
-                            <button 
-                                type="submit"
-                                disabled={loading || !userApiKey}
-                            >
-                                {loading ? 'Searching...' : 'Search'}
-                            </button>
-                        </div>
+                        <button 
+                            type="submit"
+                            disabled={loading || !userApiKey}
+                        >
+                            {loading ? 'Searching...' : 'Search'}
+                        </button>
                     </form>
                     
-                    {/* Move sort button outside the form to prevent it from triggering form submission */}
-                    <div className="sort-controls">
+                    <div className="search-form-controls">
                         <button 
                             type="button"
                             onClick={toggleSort}
@@ -333,7 +330,6 @@ function Dashboard() {
                         >
                             Sort {sortOrder === 'asc' ? '↓' : '↑'}
                         </button>
-                        
                         {(searchQuery || (filteredData && countryData && filteredData.length !== countryData.length)) && (
                             <button 
                                 type="button" 
