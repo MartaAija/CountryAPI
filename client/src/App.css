@@ -1524,7 +1524,7 @@ form.form-group input[type="password"] {
         grid-template-columns: 1fr;
     }
 }
-.loading-spinne,
+.loading-spinner,
 .results-counter {
   text-align: center;
   margin: 1rem;
