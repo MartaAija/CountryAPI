@@ -304,13 +304,13 @@ function Dashboard() {
 
                 {/* Search input with suggestions dropdown */}
                 <div className="search-container" ref={searchContainerRef}>
-            <form onSubmit={handleSearch} className="search-form">
-                <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    <form onSubmit={handleSearch} className="search-form">
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
                             placeholder={getPlaceholderText()}
-                    className="search-input"
+                            className="search-input"
                             disabled={!userApiKey}
                         />
                         <div className="search-form-controls">
@@ -318,32 +318,37 @@ function Dashboard() {
                                 type="submit"
                                 disabled={loading || !userApiKey}
                             >
-                    {loading ? 'Searching...' : 'Search'}
-                </button>
-                            <button 
-                                type="button"
-                                onClick={toggleSort}
-                                className="btn-secondary"
-                                disabled={!filteredData}
-                            >
-                                Sort {sortOrder === 'asc' ? '↓' : '↑'}
+                                {loading ? 'Searching...' : 'Search'}
                             </button>
-                            {(searchQuery || (filteredData && countryData && filteredData.length !== countryData.length)) && (
-                                <button 
-                                    type="button" 
-                                    onClick={() => {
-                                        setSearchQuery('');
-                                        setFilteredData(countryData);
-                                        hideDropdown();
-                                    }}
-                                    disabled={!userApiKey}
-                                    className="btn-secondary"
-                                >
-                                    Show All
-                                </button>
-                            )}
                         </div>
-            </form>
+                    </form>
+                    
+                    {/* Move sort button outside the form to prevent it from triggering form submission */}
+                    <div className="sort-controls">
+                        <button 
+                            type="button"
+                            onClick={toggleSort}
+                            className="btn-secondary"
+                            disabled={!filteredData}
+                        >
+                            Sort {sortOrder === 'asc' ? '↓' : '↑'}
+                        </button>
+                        
+                        {(searchQuery || (filteredData && countryData && filteredData.length !== countryData.length)) && (
+                            <button 
+                                type="button" 
+                                onClick={() => {
+                                    setSearchQuery('');
+                                    setFilteredData(countryData);
+                                    hideDropdown();
+                                }}
+                                disabled={!userApiKey}
+                                className="btn-secondary"
+                            >
+                                Show All
+                            </button>
+                        )}
+                    </div>
 
                     {/* Search suggestions dropdown */}
                     {showSuggestions && searchSuggestions.length > 0 && (
