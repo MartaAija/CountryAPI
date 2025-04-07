@@ -168,7 +168,6 @@ function Dashboard() {
             // 5. Then update the sort order in a separate operation
             setSortOrder(newSortOrder);
         } catch (error) {
-            console.error("Error during sorting:", error);
         }
     };
 
@@ -327,7 +326,6 @@ function Dashboard() {
                                         
                                         setFilteredData(results);
                                     } catch (err) {
-                                        console.error("Search error:", err);
                                         setError('Failed to search countries');
                                     } finally {
                                         setLoading(false);
@@ -391,7 +389,6 @@ function Dashboard() {
                                         
                                         setFilteredData(results);
                                     } catch (err) {
-                                        console.error("Search error:", err);
                                         setError('Failed to search countries');
                                     } finally {
                                         setLoading(false);
