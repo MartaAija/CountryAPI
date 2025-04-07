@@ -304,13 +304,13 @@ function Dashboard() {
 
                 {/* Search input with suggestions dropdown */}
                 <div className="search-container" ref={searchContainerRef}>
-            <form onSubmit={handleSearch} className="search-form">
-                <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    <form onSubmit={handleSearch} className="search-form">
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
                             placeholder={getPlaceholderText()}
-                    className="search-input"
+                            className="search-input"
                             disabled={!userApiKey}
                         />
                         <div className="search-form-controls">
@@ -318,11 +318,14 @@ function Dashboard() {
                                 type="submit"
                                 disabled={loading || !userApiKey}
                             >
-                    {loading ? 'Searching...' : 'Search'}
-                </button>
+                                {loading ? 'Searching...' : 'Search'}
+                            </button>
                             <button 
-                                type="button"
-                                onClick={toggleSort}
+                                type="button" 
+                                onClick={(e) => {
+                                    e.preventDefault(); // Prevent form submission
+                                    toggleSort();
+                                }}
                                 className="btn-secondary"
                                 disabled={!filteredData}
                             >
@@ -343,7 +346,7 @@ function Dashboard() {
                                 </button>
                             )}
                         </div>
-            </form>
+                    </form>
 
                     {/* Search suggestions dropdown */}
                     {showSuggestions && searchSuggestions.length > 0 && (
