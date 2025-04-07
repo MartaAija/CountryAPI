@@ -138,13 +138,26 @@ function Dashboard() {
         });
     };
 
-    // Toggle sort order between ascending and descending
-    const toggleSort = () => {
+    // Completely standalone sort function that doesn't interact with search
+    const performSort = () => {
+        // Toggle sort order
         const newOrder = sortOrder === 'asc' ? 'desc' : 'asc';
         setSortOrder(newOrder);
-        if (filteredData) {
-            const sortedData = sortCountries(filteredData, newOrder);
-            setFilteredData(sortedData);
+        
+        // Sort only if we have data
+        if (filteredData && filteredData.length > 0) {
+            // Create a new copy to avoid mutations
+            const dataCopy = [...filteredData];
+            
+            // Sort the data copy
+            dataCopy.sort((a, b) => {
+                return newOrder === 'asc' 
+                    ? a.name.localeCompare(b.name)
+                    : b.name.localeCompare(a.name);
+            });
+            
+            // Update the state with sorted data
+            setFilteredData(dataCopy);
         }
     };
 
@@ -323,31 +336,37 @@ function Dashboard() {
                         >
                             {loading ? 'Searching...' : 'Search'}
                         </button>
-                        
-                        <button 
-                            type="button" 
-                            onClick={toggleSort}
-                            className="btn-secondary"
-                            disabled={!filteredData}
-                        >
-                            Sort {sortOrder === 'asc' ? '↓' : '↑'}
-                        </button>
-                        
-                        {(searchQuery || (filteredData && countryData && filteredData.length !== countryData.length)) && (
+                    </div>
+                    
+                    {/* Completely isolated Sort button */}
+                    {filteredData && (
+                        <div style={{ marginBottom: '15px' }}>
                             <button 
                                 type="button" 
-                                onClick={() => {
-                                    setSearchQuery('');
-                                    setFilteredData(countryData);
-                                    hideDropdown();
-                                }}
-                                disabled={!userApiKey}
                                 className="btn-secondary"
+                                onClick={performSort}
+                                disabled={!filteredData}
                             >
-                                Show All
+                                Sort {sortOrder === 'asc' ? '↓' : '↑'}
                             </button>
-                        )}
-                    </div>
+                            
+                            {(searchQuery || (filteredData && countryData && filteredData.length !== countryData.length)) && (
+                                <button 
+                                    type="button" 
+                                    onClick={() => {
+                                        setSearchQuery('');
+                                        setFilteredData(countryData);
+                                        hideDropdown();
+                                    }}
+                                    disabled={!userApiKey}
+                                    className="btn-secondary"
+                                    style={{ marginLeft: '10px' }}
+                                >
+                                    Show All
+                                </button>
+                            )}
+                        </div>
+                    )}
                     
                     {/* Search suggestions dropdown */}
                     {showSuggestions && searchSuggestions.length > 0 && (
