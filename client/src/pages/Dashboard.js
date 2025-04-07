@@ -304,24 +304,27 @@ function Dashboard() {
 
                 {/* Search input with suggestions dropdown */}
                 <div className="search-container" ref={searchContainerRef}>
-                    <form onSubmit={handleSearch} className="search-form">
-                        <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder={getPlaceholderText()}
-                            className="search-input"
-                            disabled={!userApiKey}
-                        />
-                        <div className="search-form-controls">
+                    <div style={{ width: '100%' }}>
+                        <form onSubmit={handleSearch} className="search-form" style={{ marginBottom: '10px' }}>
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder={getPlaceholderText()}
+                                className="search-input"
+                                disabled={!userApiKey}
+                            />
                             <button 
                                 type="submit"
                                 disabled={loading || !userApiKey}
+                                style={{ marginLeft: '10px' }}
                             >
                                 {loading ? 'Searching...' : 'Search'}
                             </button>
+                        </form>
                         
-                            {/* Sort button moved outside the form submission flow */}
+                        {/* Buttons separated from form */}
+                        <div className="search-form-controls">
                             <button 
                                 type="button" 
                                 onClick={toggleSort}
@@ -346,7 +349,7 @@ function Dashboard() {
                                 </button>
                             )}
                         </div>
-                    </form>
+                    </div>
                     
                     {/* Search suggestions dropdown */}
                     {showSuggestions && searchSuggestions.length > 0 && (
