@@ -44,41 +44,18 @@ function Dashboard() {
 
     // Fetch all countries using the provided API key - converted to useCallback
     const fetchAllCountries = useCallback(async (apiKey) => {
-        console.log('Fetching countries with API key...');
         setLoading(true);
         setError('');
-        try {
-            console.log(`Using API base URL: ${config.apiBaseUrl}`);
-            console.log(`Full URL: ${config.apiBaseUrl}/api/countries/all`);
-            console.log(`API Key: ${apiKey.substring(0, 5)}...`); // Only log first 5 chars for security
-            
+        try {       
             const response = await axios.get(`${config.apiBaseUrl}/api/countries/all`, {
                 headers: { 
                     'X-API-Key': apiKey
                 }
             });
-            
-            console.log('API response received:', response.status);
             const sortedData = sortCountries(response.data, sortOrder);
             setCountryData(sortedData);
             setFilteredData(sortedData);
         } catch (error) {
-            console.error('Error fetching countries:', error);
-            // Log detailed error information
-            if (error.response) {
-                // The request was made and the server responded with a status code
-                // that falls out of the range of 2xx
-                console.error('Error data:', error.response.data);
-                console.error('Error status:', error.response.status);
-                console.error('Error headers:', error.response.headers);
-            } else if (error.request) {
-                // The request was made but no response was received
-                console.error('No response received:', error.request);
-            } else {
-                // Something happened in setting up the request that triggered an Error
-                console.error('Error message:', error.message);
-            }
-            
             handleApiError(error);
         } finally {
             setLoading(false);

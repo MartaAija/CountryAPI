@@ -29,9 +29,8 @@ app.use(cors({
     }
     
     if (allowedOrigins.indexOf(origin) === -1) {
-      // Log the rejected origin for debugging
-      console.warn(`Origin ${origin} not allowed by CORS`);
-      return callback(null, true); // Temporarily allowing all origins
+      // Origin not in whitelist, but temporarily allowing all origins
+      return callback(null, true);
     }
     
     return callback(null, true);
@@ -96,5 +95,6 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 setTimeout(() => {
   app.listen(PORT, () => {
+    // Server started successfully
   });
 }, 5000); // 5 second delay to give database initialization time to complete 

@@ -41,7 +41,6 @@ const processCountryData = (country) => {
             flag: country.flags.png
         };
     } catch (error) {
-        console.error('Error processing country data:', error);
         // Return null for invalid countries
         return null;
     }
@@ -62,33 +61,22 @@ const fetchCountriesWithRetry = async (retries = 3) => {
             'Accept': 'application/json',
             'User-Agent': 'CountryAPI/1.0',
             'Connection': 'keep-alive'
-        },
-        // Add proxy configuration if needed to bypass network restrictions
-        // proxy: {
-        //   host: process.env.PROXY_HOST,
-        //   port: process.env.PROXY_PORT
-        // }
+        }
     });
 
     for (let i = 0; i < retries; i++) {
         try {
-            console.log(`Attempt ${i+1} to fetch country data from external API`);
             // Try multiple alternative URLs in case one is blocked
             let response;
             try {
                 // Primary URL
                 response = await axiosInstance.get('https://restcountries.com/v3.1/all');
             } catch (primaryError) {
-                console.error(`Primary URL failed: ${primaryError.message}, trying alternative...`);
                 // Alternative URL (sometimes helps bypass network restrictions)
                 response = await axiosInstance.get('https://restcountries.com/v3.1/all?fields=name,capital,currencies,languages,flags');
             }
-            
-            console.log(`Successfully fetched ${response.data.length} countries from external API`);
             return response.data;
         } catch (error) {
-            console.error(`Error on attempt ${i+1}:`, error.message);
-            
             // If we've reached the maximum retries, throw the error
             if (i === retries - 1) throw error;
             
@@ -107,14 +95,11 @@ const fetchCountriesWithRetry = async (retries = 3) => {
  * @param {Object} res - Express response object
  */
 async function getAllCountries(req, res) {
-    console.log('getAllCountries API call received');
-    
     try {
         // Fetch countries with retry mechanism for reliability
         const countriesData = await fetchCountriesWithRetry();
         
         // Process and filter the data to ensure consistent format
-        console.log('Processing country data...');
         // This maps each country through the processor and filters out any null results
         const processedData = countriesData
             .map(processCountryData)
@@ -122,23 +107,12 @@ async function getAllCountries(req, res) {
 
         // Verify we have valid data to return
         if (processedData.length === 0) {
-            console.error('No valid country data received from external API');
             throw new Error('No valid country data received');
         }
-
-        console.log(`Returning ${processedData.length} processed countries`);
+        
         // Return processed data as JSON
         res.json(processedData);
     } catch (error) {
-        console.error('Error in getAllCountries:', error);
-        // Log additional details about the error
-        if (error.response) {
-            console.error('Error response status:', error.response.status);
-            console.error('Error response data:', error.response.data);
-        } else if (error.request) {
-            console.error('No response received from external API');
-        }
-        
         // Detailed user-friendly error message
         res.status(500).json({ 
             error: 'Failed to fetch countries',
@@ -172,7 +146,6 @@ async function searchCountries(req, res) {
         // Return filtered data as JSON
         res.json(processedData);
     } catch (error) {
-        console.error('Error in searchCountries:', error);
         // Special handling for "not found" responses
         if (error.response?.status === 404) {
             res.json([]); // Return empty array for no results (better UX than an error)
