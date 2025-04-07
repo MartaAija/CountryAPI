@@ -1123,7 +1123,7 @@ form.form-group input[type="password"] {
     background: var(--background-dark);
     border: 1px solid var(--border-color);
     border-radius: 0.75rem;
-    margin-top: 0.1rem;
+    margin-top: 0.2rem;
     max-height: 300px;
     overflow-y: auto;
     z-index: 1000;
@@ -1524,7 +1524,7 @@ form.form-group input[type="password"] {
         grid-template-columns: 1fr;
     }
 }
-
+.loading-spinne,
 .results-counter {
   text-align: center;
   margin: 1rem;
