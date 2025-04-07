@@ -199,14 +199,7 @@ function Dashboard() {
     };
 
     // Handle search form submission
-    const handleSearch = async (e) => {
-        if (e) {
-            e.preventDefault();
-        }
-        
-        // Always hide dropdown first
-        hideDropdown();
-
+    const handleSearch = async () => {
         if (!searchQuery.trim()) {
             setFilteredData(countryData);
             return;
@@ -302,53 +295,58 @@ function Dashboard() {
                     </button>
                 </div>
 
-                {/* Search input with suggestions dropdown */}
+                {/* Search input with suggestions dropdown - No form wrapper */}
                 <div className="search-container" ref={searchContainerRef}>
-                    <div style={{ width: '100%' }}>
-                        <form onSubmit={handleSearch} className="search-form" style={{ marginBottom: '10px' }}>
-                            <input
-                                type="text"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder={getPlaceholderText()}
-                                className="search-input"
-                                disabled={!userApiKey}
-                            />
-                            <button 
-                                type="submit"
-                                disabled={loading || !userApiKey}
-                                style={{ marginLeft: '10px' }}
-                            >
-                                {loading ? 'Searching...' : 'Search'}
-                            </button>
-                        </form>
+                    <div className="search-input-container" style={{ width: '100%', marginBottom: '15px' }}>
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder={getPlaceholderText()}
+                            className="search-input"
+                            disabled={!userApiKey}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleSearch();
+                                }
+                            }}
+                        />
+                    </div>
+                    
+                    {/* Buttons row - completely separate from any form */}
+                    <div className="button-row" style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+                        <button 
+                            type="button"
+                            onClick={() => handleSearch()}
+                            disabled={loading || !userApiKey}
+                        >
+                            {loading ? 'Searching...' : 'Search'}
+                        </button>
                         
-                        {/* Buttons separated from form */}
-                        <div className="search-form-controls">
+                        <button 
+                            type="button" 
+                            onClick={toggleSort}
+                            className="btn-secondary"
+                            disabled={!filteredData}
+                        >
+                            Sort {sortOrder === 'asc' ? '↓' : '↑'}
+                        </button>
+                        
+                        {(searchQuery || (filteredData && countryData && filteredData.length !== countryData.length)) && (
                             <button 
                                 type="button" 
-                                onClick={toggleSort}
+                                onClick={() => {
+                                    setSearchQuery('');
+                                    setFilteredData(countryData);
+                                    hideDropdown();
+                                }}
+                                disabled={!userApiKey}
                                 className="btn-secondary"
-                                disabled={!filteredData}
                             >
-                                Sort {sortOrder === 'asc' ? '↓' : '↑'}
+                                Show All
                             </button>
-                            
-                            {(searchQuery || (filteredData && countryData && filteredData.length !== countryData.length)) && (
-                                <button 
-                                    type="button" 
-                                    onClick={() => {
-                                        setSearchQuery('');
-                                        setFilteredData(countryData);
-                                        hideDropdown();
-                                    }}
-                                    disabled={!userApiKey}
-                                    className="btn-secondary"
-                                >
-                                    Show All
-                                </button>
-                            )}
-                        </div>
+                        )}
                     </div>
                     
                     {/* Search suggestions dropdown */}
