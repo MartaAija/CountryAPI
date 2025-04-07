@@ -320,17 +320,17 @@ function Dashboard() {
                             >
                                 {loading ? 'Searching...' : 'Search'}
                             </button>
+                        
+                            {/* Sort button moved outside the form submission flow */}
                             <button 
                                 type="button" 
-                                onClick={(e) => {
-                                    e.preventDefault(); // Prevent form submission
-                                    toggleSort();
-                                }}
+                                onClick={toggleSort}
                                 className="btn-secondary"
                                 disabled={!filteredData}
                             >
                                 Sort {sortOrder === 'asc' ? '↓' : '↑'}
                             </button>
+                            
                             {(searchQuery || (filteredData && countryData && filteredData.length !== countryData.length)) && (
                                 <button 
                                     type="button" 
@@ -347,7 +347,7 @@ function Dashboard() {
                             )}
                         </div>
                     </form>
-
+                    
                     {/* Search suggestions dropdown */}
                     {showSuggestions && searchSuggestions.length > 0 && (
                         <div className="search-suggestions">
