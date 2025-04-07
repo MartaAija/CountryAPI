@@ -265,81 +265,79 @@ function Dashboard() {
                     </button>
                 </div>
 
-                {/* Search input and button - completely separate from sorting */}
-                <div style={{ marginBottom: '20px' }}>
-                    <div className="search-container" ref={searchContainerRef}>
-                        <div className="search-input-container" style={{ width: '100%', marginBottom: '15px' }}>
-                            <input
-                                type="text"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder={getPlaceholderText()}
-                                className="search-input"
-                                disabled={!userApiKey}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        e.preventDefault();
-                                        
-                                        // Directly implement search here to match the button
-                                        if (!searchQuery.trim()) {
-                                            setFilteredData(countryData);
-                                            return;
-                                        }
-                                        if (!userApiKey) {
-                                            setError('No active API key found. Please generate an API key in Settings.');
-                                            return;
-                                        }
-                                        
-                                        setLoading(true);
-                                        setError('');
-                                        
-                                        try {
-                                            const query = searchQuery.toLowerCase().trim();
-                                            let results = [];
-                                            
-                                            // Filter based on search mode
-                                            if (searchMode === 'currency') {
-                                                results = countryData.filter(country => {
-                                                    const currencyName = country.currency?.name?.toLowerCase() || '';
-                                                    const currencyCode = country.currency?.code?.toLowerCase() || '';
-                                                    const currencySymbol = country.currency?.symbol?.toLowerCase() || '';
-                                                    return currencyName.includes(query) || 
-                                                           currencyCode.includes(query) || 
-                                                           currencySymbol.includes(query);
-                                                });
-                                            } else if (searchMode === 'language') {
-                                                results = countryData.filter(country => 
-                                                    country.languages.some(lang => 
-                                                        lang.toLowerCase().includes(query)
-                                                    )
-                                                );
-                                            } else {
-                                                results = countryData.filter(country => 
-                                                    country.name.toLowerCase().includes(query)
-                                                );
-                                            }
-                                            
-                                            // Sort the results in current order
-                                            results.sort((a, b) => {
-                                                return sortOrder === 'asc' 
-                                                    ? a.name.localeCompare(b.name)
-                                                    : b.name.localeCompare(a.name);
-                                            });
-                                            
-                                            setFilteredData(results);
-                                        } catch (err) {
-                                            console.error("Search error:", err);
-                                            setError('Failed to search countries');
-                                        } finally {
-                                            setLoading(false);
-                                        }
+                {/* Search input and buttons in one line */}
+                <div className="search-container" ref={searchContainerRef}>
+                    <div className="search-input-with-buttons">
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder={getPlaceholderText()}
+                            className="search-input-field"
+                            disabled={!userApiKey}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    
+                                    // Directly implement search here to match the button
+                                    if (!searchQuery.trim()) {
+                                        setFilteredData(countryData);
+                                        return;
                                     }
-                                }}
-                            />
-                        </div>
+                                    if (!userApiKey) {
+                                        setError('No active API key found. Please generate an API key in Settings.');
+                                        return;
+                                    }
+                                    
+                                    setLoading(true);
+                                    setError('');
+                                    
+                                    try {
+                                        const query = searchQuery.toLowerCase().trim();
+                                        let results = [];
+                                        
+                                        // Filter based on search mode
+                                        if (searchMode === 'currency') {
+                                            results = countryData.filter(country => {
+                                                const currencyName = country.currency?.name?.toLowerCase() || '';
+                                                const currencyCode = country.currency?.code?.toLowerCase() || '';
+                                                const currencySymbol = country.currency?.symbol?.toLowerCase() || '';
+                                                return currencyName.includes(query) || 
+                                                       currencyCode.includes(query) || 
+                                                       currencySymbol.includes(query);
+                                            });
+                                        } else if (searchMode === 'language') {
+                                            results = countryData.filter(country => 
+                                                country.languages.some(lang => 
+                                                    lang.toLowerCase().includes(query)
+                                                )
+                                            );
+                                        } else {
+                                            results = countryData.filter(country => 
+                                                country.name.toLowerCase().includes(query)
+                                            );
+                                        }
+                                        
+                                        // Sort the results in current order
+                                        results.sort((a, b) => {
+                                            return sortOrder === 'asc' 
+                                                ? a.name.localeCompare(b.name)
+                                                : b.name.localeCompare(a.name);
+                                        });
+                                        
+                                        setFilteredData(results);
+                                    } catch (err) {
+                                        console.error("Search error:", err);
+                                        setError('Failed to search countries');
+                                    } finally {
+                                        setLoading(false);
+                                    }
+                                }
+                            }}
+                        />
                         
-                        {/* Search button only */}
-                        <div className="button-row" style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+                        {/* All buttons in one row */}
+                        <div className="button-row">
                             <button 
                                 type="button"
                                 onClick={(e) => {
@@ -401,7 +399,7 @@ function Dashboard() {
                                 }}
                                 disabled={loading || !userApiKey}
                             >
-                                {loading ? 'Searching...' : 'Search'}
+                                {loading ? 'Searching...' : 'SEARCH'}
                             </button>
                             
                             {(searchQuery || (filteredData && countryData && filteredData.length !== countryData.length)) && (
@@ -415,60 +413,52 @@ function Dashboard() {
                                     disabled={!userApiKey}
                                     className="btn-secondary"
                                 >
-                                    Show All
+                                    SHOW ALL
                                 </button>
                             )}
-                        </div>
-                        
-                        {/* Search suggestions dropdown */}
-                        {showSuggestions && searchSuggestions.length > 0 && (
-                            <div className="search-suggestions">
-                                {searchSuggestions.map((country, index) => {
-                                    let displayText = '';
-                                    switch(searchMode) {
-                                        case 'currency':
-                                            displayText = `${country.name} (${country.currency?.name || 'N/A'} - ${country.currency?.code || 'N/A'})`;
-                                            break;
-                                        case 'language':
-                                            displayText = `${country.name} (${country.languages.join(', ')})`;
-                                            break;
-                                        default:
-                                            displayText = country.name;
-                                    }
-                                    return (
-                                        <div 
-                                            key={index}
-                                            className="suggestion-item"
-                                            onClick={() => handleCountrySelect(country)}
-                                        >
-                                            <img 
-                                                src={country.flag} 
-                                                alt="" 
-                                                className="suggestion-flag"
-                                            />
-                                            {displayText}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
-                </div>
-                
-                {/* Completely separate sort control */}
-                <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '15px', marginBottom: '20px' }}>
-                    {filteredData && filteredData.length > 0 && (
-                        <div>
-                            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
-                                <span style={{ marginRight: '10px' }}>Sort countries:</span>
+                            
+                            {filteredData && filteredData.length > 0 && (
                                 <button 
                                     type="button" 
                                     className="btn-secondary"
-                                    onClick={handleSort}  // Use the new handleSort function
+                                    onClick={handleSort}
                                 >
-                                    {sortOrder === 'asc' ? 'A to Z ↓' : 'Z to A ↑'}
+                                    {sortOrder === 'asc' ? 'A TO Z ↓' : 'Z TO A ↑'}
                                 </button>
-                            </div>
+                            )}
+                        </div>
+                    </div>
+                    
+                    {/* Search suggestions dropdown */}
+                    {showSuggestions && searchSuggestions.length > 0 && (
+                        <div className="search-suggestions">
+                            {searchSuggestions.map((country, index) => {
+                                let displayText = '';
+                                switch(searchMode) {
+                                    case 'currency':
+                                        displayText = `${country.name} (${country.currency?.name || 'N/A'} - ${country.currency?.code || 'N/A'})`;
+                                        break;
+                                    case 'language':
+                                        displayText = `${country.name} (${country.languages.join(', ')})`;
+                                        break;
+                                    default:
+                                        displayText = country.name;
+                                }
+                                return (
+                                    <div 
+                                        key={index}
+                                        className="suggestion-item"
+                                        onClick={() => handleCountrySelect(country)}
+                                    >
+                                        <img 
+                                            src={country.flag} 
+                                            alt="" 
+                                            className="suggestion-flag"
+                                        />
+                                        {displayText}
+                                    </div>
+                                );
+                            })}
                         </div>
                     )}
                 </div>
@@ -486,7 +476,7 @@ function Dashboard() {
 
             {/* Results counter - shows number of countries being displayed */}
             {filteredData && filteredData.length > 0 && (
-                <div className="results-counter text-center" style={{ marginBottom: '2rem', color: 'var(--text-secondary)' }}>
+                <div className="results-counter">
                     Displaying {filteredData.length} {filteredData.length === 1 ? 'country' : 'countries'}
                     {searchQuery && ` matching "${searchQuery}"`}
                 </div>
