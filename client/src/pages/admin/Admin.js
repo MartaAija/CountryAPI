@@ -153,8 +153,10 @@ function Admin() {
                                     {user.created_at_primary && (
                                         <p>Created: {new Date(user.created_at_primary).toLocaleString()}</p>
                                     )}
-                                    {user.last_used_primary && (
+                                    {user.last_used_primary ? (
                                         <p>Last Used: {new Date(user.last_used_primary).toLocaleString()}</p>
+                                    ) : (
+                                        <p>Last Used: Never used</p>
                                     )}
                                     <div className="api-key-controls">
                                         <button
@@ -186,8 +188,10 @@ function Admin() {
                                     {user.created_at_secondary && (
                                         <p>Created: {new Date(user.created_at_secondary).toLocaleString()}</p>
                                     )}
-                                    {user.last_used_secondary && (
+                                    {user.last_used_secondary ? (
                                         <p>Last Used: {new Date(user.last_used_secondary).toLocaleString()}</p>
+                                    ) : (
+                                        <p>Last Used: Never used</p>
                                     )}
                                     <div className="api-key-controls">
                                         <button
