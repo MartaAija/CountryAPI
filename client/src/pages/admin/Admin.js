@@ -132,8 +132,16 @@ function Admin() {
                         {/* User header with basic information and delete button */}
                         <div className="user-header">
                             <div>
-                                <h4>Username: {user.username}</h4>
-                                <p>Name: {user.first_name} {user.last_name}</p>
+                                <h4>Username: 
+                                    <span className="secure-info-tooltip">
+                                        <span className="masked-data">{user.username}</span>
+                                    </span>
+                                </h4>
+                                <p>Name: 
+                                    <span className="secure-info-tooltip">
+                                        <span className="masked-data">{user.first_name} {user.last_name}</span>
+                                    </span>
+                                </p>
                             </div>
                             <button 
                                 className="btn-danger"
@@ -148,7 +156,11 @@ function Admin() {
                             <h5>Primary API Key</h5>
                             {user.api_key_primary && user.api_key_primary !== 'No API Key' ? (
                                 <>
-                                    <p className="api-key-text">{user.api_key_primary}</p>
+                                    <p className="api-key-text">
+                                        <span className="secure-info-tooltip">
+                                            <span className="secure-api-key">{user.api_key_primary}</span>
+                                        </span>
+                                    </p>
                                     <p>Status: {user.is_active_primary ? 'Active' : 'Inactive'}</p>
                                     {user.created_at_primary && (
                                         <p>Created: {new Date(user.created_at_primary).toLocaleString()}</p>
@@ -183,7 +195,11 @@ function Admin() {
                             <h5>Secondary API Key</h5>
                             {user.api_key_secondary && user.api_key_secondary !== 'No API Key' ? (
                                 <>
-                                    <p className="api-key-text">{user.api_key_secondary}</p>
+                                    <p className="api-key-text">
+                                        <span className="secure-info-tooltip">
+                                            <span className="secure-api-key">{user.api_key_secondary}</span>
+                                        </span>
+                                    </p>
                                     <p>Status: {user.is_active_secondary ? 'Active' : 'Inactive'}</p>
                                     {user.created_at_secondary && (
                                         <p>Created: {new Date(user.created_at_secondary).toLocaleString()}</p>

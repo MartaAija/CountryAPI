@@ -244,7 +244,10 @@ function Settings() {
                     <h3>User Information</h3>
                         <div className="user-info-section">
                             <div className="info-label-pair">
-                                <strong>Username</strong><span>{userDetails.username}</span>
+                                <strong>Username</strong>
+                                <div className="secure-info-tooltip">
+                                    <span className="masked-data">{userDetails.username}</span>
+                                </div>
                             </div>
                             
                             {isEditing ? (
@@ -331,7 +334,9 @@ function Settings() {
                                 <div className="api-key-info">
                                     <div className="info-label-pair">
                                         <strong>API Key</strong>
-                                        <span>{userDetails.api_key_primary}</span>
+                                        <div className="secure-info-tooltip">
+                                            <span className="secure-api-key">{userDetails.api_key_primary}</span>
+                                        </div>
                                     </div>
                                     <div className="info-label-pair">
                                         <strong>Status</strong>
@@ -383,7 +388,9 @@ function Settings() {
                                 <div className="api-key-info">
                                     <div className="info-label-pair">
                                         <strong>API Key</strong>
-                                        <span>{userDetails.api_key_secondary}</span>
+                                        <div className="secure-info-tooltip">
+                                            <span className="secure-api-key">{userDetails.api_key_secondary}</span>
+                                        </div>
                                     </div>
                                     <div className="info-label-pair">
                                         <strong>Status</strong>
