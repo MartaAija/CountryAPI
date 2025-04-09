@@ -14,7 +14,7 @@ function Dashboard() {
     const [showSuggestions, setShowSuggestions] = useState(false); // Controls visibility of suggestions dropdown
     const [error, setError] = useState(''); // Stores error messages
     const [loading, setLoading] = useState(false); // Indicates when data is being fetched
-    const [hasActiveApiKey, setHasActiveApiKey] = useState(false); // Flag to track if user has an active API key
+    const [userApiKey, setUserApiKey] = useState(null); // User's active API key for requests
     const [sortOrder, setSortOrder] = useState('asc'); // Controls sorting direction (ascending/descending)
     const [searchMode, setSearchMode] = useState('country'); // Current search mode (country, currency, language)
     const [showBackToTop, setShowBackToTop] = useState(false); // Controls visibility of back-to-top button
@@ -72,21 +72,15 @@ function Dashboard() {
                 });
                 
                 // Try primary key first, then secondary if primary is not active
-                let activeKey = null;
                 if (response.data.api_key_primary && response.data.is_active_primary) {
-                    activeKey = response.data.api_key_primary;
-                    setHasActiveApiKey(true);
+                    setUserApiKey(response.data.api_key_primary);
+                    fetchAllCountries(response.data.api_key_primary);
                 } else if (response.data.api_key_secondary && response.data.is_active_secondary) {
-                    activeKey = response.data.api_key_secondary;
-                    setHasActiveApiKey(true);
+                    setUserApiKey(response.data.api_key_secondary);
+                    fetchAllCountries(response.data.api_key_secondary);
                 } else {
-                    setHasActiveApiKey(false);
                     setError('No active API key found. Please generate and activate an API key in Settings.');
-                    return;
                 }
-                
-                // Use the active key to fetch data but don't store it in state
-                fetchAllCountries(activeKey);
             } catch (error) {
                 setError('Failed to fetch API key');
             }
@@ -241,7 +235,7 @@ function Dashboard() {
             <h2>Country Information</h2>
             
             {/* Display warning if no API key is available */}
-            {!hasActiveApiKey && (
+            {!userApiKey && (
                 <div className="message error-message">
                     <p>⚠️ No active API key found. Please visit your Settings page to activate your existing API key or generate a new one.</p>
                 </div>
@@ -279,7 +273,7 @@ function Dashboard() {
                             onChange={(e) => setSearchQuery(e.target.value)}
                             placeholder={getPlaceholderText()}
                             className="search-input-field"
-                            disabled={!hasActiveApiKey}
+                            disabled={!userApiKey}
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
                                     e.preventDefault();
@@ -289,7 +283,7 @@ function Dashboard() {
                                         setFilteredData(countryData);
                                         return;
                                     }
-                                    if (!hasActiveApiKey) {
+                                    if (!userApiKey) {
                                         setError('No active API key found. Please generate an API key in Settings.');
                                         return;
                                     }
@@ -352,7 +346,7 @@ function Dashboard() {
                                         setFilteredData(countryData);
                                         return;
                                     }
-                                    if (!hasActiveApiKey) {
+                                    if (!userApiKey) {
                                         setError('No active API key found. Please generate an API key in Settings.');
                                         return;
                                     }
@@ -400,7 +394,7 @@ function Dashboard() {
                                         setLoading(false);
                                     }
                                 }}
-                                disabled={loading || !hasActiveApiKey}
+                                disabled={loading || !userApiKey}
                             >
                                 {loading ? 'Searching...' : 'SEARCH'}
                             </button>
@@ -413,7 +407,7 @@ function Dashboard() {
                                         setFilteredData(countryData);
                                         hideDropdown();
                                     }}
-                                    disabled={!hasActiveApiKey}
+                                    disabled={!userApiKey}
                                     className="btn-secondary"
                                 >
                                     SHOW ALL

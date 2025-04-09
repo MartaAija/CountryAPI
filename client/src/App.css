@@ -17,64 +17,6 @@
   --nav-height: 4rem;
 }
 
-/* Security Features - Masking Sensitive Data */
-.masked-data {
-  filter: blur(4px);
-  transition: filter 0.2s ease;
-  user-select: none;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-}
-
-.masked-data:hover {
-  filter: blur(0);
-}
-
-.secure-api-key {
-  font-family: monospace;
-  letter-spacing: 1px;
-  word-break: break-all;
-  filter: blur(4px);
-  transition: filter 0.2s ease;
-  user-select: none;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-}
-
-.secure-api-key:hover {
-  filter: blur(0);
-}
-
-/* Security tooltip */
-.secure-info-tooltip {
-  position: relative;
-  display: inline-block;
-}
-
-.secure-info-tooltip::after {
-  content: "Hover to view";
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%) translateY(100%);
-  background-color: rgba(0, 0, 0, 0.8);
-  color: white;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.8rem;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s ease;
-  white-space: nowrap;
-  z-index: 10;
-}
-
-.secure-info-tooltip:hover::after {
-  opacity: 1;
-}
-
 /* Base Styles */
 body {
     margin: 0;
@@ -1587,4 +1529,57 @@ form.form-group input[type="password"] {
   text-align: center;
   margin: 1rem;
   color: var(--text-secondary);
+}
+
+/* API Key Management Styles */
+.key-reveal-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.key-reveal-container span,
+.key-reveal-container p {
+  font-family: monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-grow: 1;
+}
+
+.btn-small {
+  padding: 0.25rem 0.5rem !important;
+  font-size: 0.8rem !important;
+  height: auto !important;
+  min-width: 65px;
+}
+
+/* Override for API key text */
+.api-key-text {
+  font-family: monospace;
+  background-color: rgba(0, 0, 0, 0.2);
+  padding: 0.5rem;
+  border-radius: 0.25rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.9rem;
+}
+
+/* Info label pair container for Settings page */
+.info-label-pair {
+  display: flex;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.info-label-pair strong {
+  width: 100px;
+  flex-shrink: 0;
+}
+
+.info-label-pair > span,
+.info-label-pair > div {
+  flex-grow: 1;
 }

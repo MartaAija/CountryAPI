@@ -17,9 +17,20 @@ function Settings() {
     const [isEditing, setIsEditing] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [apiKeys, setApiKeys] = useState([]);
+    
+    // State to control API key visibility
+    const [showPrimaryKey, setShowPrimaryKey] = useState(false);
+    const [showSecondaryKey, setShowSecondaryKey] = useState(false);
 
     // Use config for API base URL
     const API_BASE_URL = `${config.apiBaseUrl}/auth`;
+
+    // Helper function to mask API key for security
+    const maskApiKey = (key) => {
+        if (!key) return '';
+        // Show first 4 and last 4 characters, mask the rest
+        return key.substring(0, 4) + '••••••••••••' + key.substring(key.length - 4);
+    };
 
     // Fetch user profile data with authentication token
     // Memoized with useCallback to prevent unnecessary re-renders
@@ -37,6 +48,10 @@ function Settings() {
             setUserDetails(response.data);
             setFirstName(response.data.first_name || "");
             setLastName(response.data.last_name || "");
+            
+            // Reset visibility state when loading new data
+            setShowPrimaryKey(false);
+            setShowSecondaryKey(false);
         } catch (error) {
             setMessage("Failed to load profile");
         }
@@ -219,6 +234,16 @@ function Settings() {
         }
     };
 
+    // Toggle API key visibility for primary key
+    const togglePrimaryKeyVisibility = () => {
+        setShowPrimaryKey(!showPrimaryKey);
+    };
+
+    // Toggle API key visibility for secondary key
+    const toggleSecondaryKeyVisibility = () => {
+        setShowSecondaryKey(!showSecondaryKey);
+    };
+
     // Helper function to determine message styling based on content
     // Returns appropriate CSS class for success or error messages
     const getMessageClass = (msg) => {
@@ -244,10 +269,7 @@ function Settings() {
                     <h3>User Information</h3>
                         <div className="user-info-section">
                             <div className="info-label-pair">
-                                <strong>Username</strong>
-                                <div className="secure-info-tooltip">
-                                    <span className="masked-data">{userDetails.username}</span>
-                                </div>
+                                <strong>Username</strong><span>{userDetails.username}</span>
                             </div>
                             
                             {isEditing ? (
@@ -334,8 +356,14 @@ function Settings() {
                                 <div className="api-key-info">
                                     <div className="info-label-pair">
                                         <strong>API Key</strong>
-                                        <div className="secure-info-tooltip">
-                                            <span className="secure-api-key">{userDetails.api_key_primary}</span>
+                                        <div className="key-reveal-container">
+                                            <span>{showPrimaryKey ? userDetails.api_key_primary : maskApiKey(userDetails.api_key_primary)}</span>
+                                            <button 
+                                                className="btn-secondary btn-small"
+                                                onClick={togglePrimaryKeyVisibility}
+                                            >
+                                                {showPrimaryKey ? 'Hide' : 'Reveal'}
+                                            </button>
                                         </div>
                                     </div>
                                     <div className="info-label-pair">
@@ -388,8 +416,14 @@ function Settings() {
                                 <div className="api-key-info">
                                     <div className="info-label-pair">
                                         <strong>API Key</strong>
-                                        <div className="secure-info-tooltip">
-                                            <span className="secure-api-key">{userDetails.api_key_secondary}</span>
+                                        <div className="key-reveal-container">
+                                            <span>{showSecondaryKey ? userDetails.api_key_secondary : maskApiKey(userDetails.api_key_secondary)}</span>
+                                            <button 
+                                                className="btn-secondary btn-small"
+                                                onClick={toggleSecondaryKeyVisibility}
+                                            >
+                                                {showSecondaryKey ? 'Hide' : 'Reveal'}
+                                            </button>
                                         </div>
                                     </div>
                                     <div className="info-label-pair">

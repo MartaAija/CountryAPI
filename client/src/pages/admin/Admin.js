@@ -13,6 +13,9 @@ function Admin() {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [selectedUser, setSelectedUser] = useState(null);
     const navigate = useNavigate();
+    
+    // State to track visibility of API keys for each user
+    const [visibleKeys, setVisibleKeys] = useState({});
 
     // Check admin authorization and load users data on component mount
     useEffect(() => {
@@ -26,11 +29,37 @@ function Admin() {
         fetchUsers();
     }, [navigate]);
 
+    // Helper function to mask API key for security
+    const maskApiKey = (key) => {
+        if (!key) return '';
+        // Show first 4 and last 4 characters, mask the rest
+        return key.substring(0, 4) + '••••••••••••' + key.substring(key.length - 4);
+    };
+
+    // Toggle visibility of a specific API key
+    const toggleKeyVisibility = (userId, keyType) => {
+        setVisibleKeys(prev => {
+            const key = `${userId}-${keyType}`;
+            return {
+                ...prev,
+                [key]: !prev[key]
+            };
+        });
+    };
+
+    // Check if a specific key is currently visible
+    const isKeyVisible = (userId, keyType) => {
+        const key = `${userId}-${keyType}`;
+        return visibleKeys[key] || false;
+    };
+
     // Fetch all users from the API
     const fetchUsers = async () => {
         try {
             const response = await axios.get(`${config.apiBaseUrl}/auth/users`);
             setUsers(response.data);
+            // Reset key visibility when loading new data
+            setVisibleKeys({});
         } catch (error) {
             setMessage('Failed to fetch users');
         }
@@ -132,16 +161,8 @@ function Admin() {
                         {/* User header with basic information and delete button */}
                         <div className="user-header">
                             <div>
-                                <h4>Username: 
-                                    <span className="secure-info-tooltip">
-                                        <span className="masked-data">{user.username}</span>
-                                    </span>
-                                </h4>
-                                <p>Name: 
-                                    <span className="secure-info-tooltip">
-                                        <span className="masked-data">{user.first_name} {user.last_name}</span>
-                                    </span>
-                                </p>
+                                <h4>Username: {user.username}</h4>
+                                <p>Name: {user.first_name} {user.last_name}</p>
                             </div>
                             <button 
                                 className="btn-danger"
@@ -156,11 +177,20 @@ function Admin() {
                             <h5>Primary API Key</h5>
                             {user.api_key_primary && user.api_key_primary !== 'No API Key' ? (
                                 <>
-                                    <p className="api-key-text">
-                                        <span className="secure-info-tooltip">
-                                            <span className="secure-api-key">{user.api_key_primary}</span>
-                                        </span>
-                                    </p>
+                                    <div className="key-reveal-container">
+                                        <p className="api-key-text">
+                                            {isKeyVisible(user.id, 'primary') 
+                                                ? user.api_key_primary 
+                                                : maskApiKey(user.api_key_primary)
+                                            }
+                                        </p>
+                                        <button 
+                                            className="btn-secondary btn-small"
+                                            onClick={() => toggleKeyVisibility(user.id, 'primary')}
+                                        >
+                                            {isKeyVisible(user.id, 'primary') ? 'Hide' : 'Reveal'}
+                                        </button>
+                                    </div>
                                     <p>Status: {user.is_active_primary ? 'Active' : 'Inactive'}</p>
                                     {user.created_at_primary && (
                                         <p>Created: {new Date(user.created_at_primary).toLocaleString()}</p>
@@ -195,11 +225,20 @@ function Admin() {
                             <h5>Secondary API Key</h5>
                             {user.api_key_secondary && user.api_key_secondary !== 'No API Key' ? (
                                 <>
-                                    <p className="api-key-text">
-                                        <span className="secure-info-tooltip">
-                                            <span className="secure-api-key">{user.api_key_secondary}</span>
-                                        </span>
-                                    </p>
+                                    <div className="key-reveal-container">
+                                        <p className="api-key-text">
+                                            {isKeyVisible(user.id, 'secondary') 
+                                                ? user.api_key_secondary 
+                                                : maskApiKey(user.api_key_secondary)
+                                            }
+                                        </p>
+                                        <button 
+                                            className="btn-secondary btn-small"
+                                            onClick={() => toggleKeyVisibility(user.id, 'secondary')}
+                                        >
+                                            {isKeyVisible(user.id, 'secondary') ? 'Hide' : 'Reveal'}
+                                        </button>
+                                    </div>
                                     <p>Status: {user.is_active_secondary ? 'Active' : 'Inactive'}</p>
                                     {user.created_at_secondary && (
                                         <p>Created: {new Date(user.created_at_secondary).toLocaleString()}</p>
