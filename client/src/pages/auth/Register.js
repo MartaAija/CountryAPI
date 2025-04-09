@@ -14,7 +14,7 @@ function Register() {
     const [confirmPassword, setConfirmPassword] = useState("");
     // State for UI control and feedback
     const [showModal, setShowModal] = useState(false);
-    const [message, setMessage] = useState("");
+    const [setMessage] = useState("");
     const [error, setError] = useState("");
     const [passwordErrors, setPasswordErrors] = useState([]);
     const navigate = useNavigate();

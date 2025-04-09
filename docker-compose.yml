@@ -24,8 +24,8 @@ services:
       - DB_HOST=db
       - DB_USER=user
       - DB_PASSWORD=password123
-      - DB_NAME=country_api_db
-      - JWT_SECRET=your_jwt_secret
+      - DB_NAME=country_api
+      - JWT_SECRET=uT5x8zP3qR7vW2yA6bN1cM9dF4gH7jK2
     volumes:
       - ./secure-api-middleware:/app
       - /app/node_modules
@@ -36,7 +36,7 @@ services:
       - "3306:3306"
     environment:
       - MYSQL_ROOT_PASSWORD=rootpassword
-      - MYSQL_DATABASE=country_api_db
+      - MYSQL_DATABASE=country_api
       - MYSQL_USER=user
       - MYSQL_PASSWORD=password123
     volumes:

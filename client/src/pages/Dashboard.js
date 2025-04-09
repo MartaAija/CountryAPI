@@ -130,14 +130,6 @@ function Dashboard() {
         }
     }, [searchQuery, countryData, searchMode]);
 
-    // Sort countries alphabetically by name in ascending or descending order
-    const sortCountries = (countries, order) => {
-        return [...countries].sort((a, b) => {
-            return order === 'asc' 
-                ? a.name.localeCompare(b.name)
-                : b.name.localeCompare(a.name);
-        });
-    };
 
     // Brand new sort function that doesn't interact with search
     const handleSort = () => {
@@ -175,13 +167,6 @@ function Dashboard() {
     const handleApiError = (error) => {
         if (error.response?.status === 401) {
             setError('Invalid or inactive API key. Please check your API key in Settings.');
-        } else if (error.response?.status === 429) {
-            // Rate limit exceeded handling
-            const resetTime = error.response.headers['ratelimit-reset'] 
-                ? new Date(Number(error.response.headers['ratelimit-reset']) * 1000).toLocaleTimeString()
-                : 'a few minutes';
-            
-            setError(`Rate limit exceeded. You have used all 3 requests in your 15-minute window. Please try again after ${resetTime}.`);
         } else {
             setError('Failed to fetch country data');
         }

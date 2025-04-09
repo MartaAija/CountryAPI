@@ -23,7 +23,8 @@ function Login() {
             
             // Special case: Admin authentication with hardcoded credentials
             // In production, this would typically use a secure authentication endpoint
-            if (username === 'admin' && password === 'admin1234') {
+            if (username === process.env.REACT_APP_ADMIN_USERNAME && 
+                password === process.env.REACT_APP_ADMIN_PASSWORD) {
                 localStorage.setItem('isAdmin', 'true');
                 localStorage.setItem('token', 'admin-token');
                 
