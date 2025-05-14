@@ -47,35 +47,16 @@ function validateToken(sessionId, token) {
     // If not found, try the anonymous token
     if (!storedData) {
         storedData = csrfTokens.get('anonymous');
-        console.log(`No token for session ${sessionId}, trying anonymous token`);
     }
     
     // If still not found, try the global token
     if (!storedData) {
         storedData = csrfTokens.get('global');
-        console.log(`No anonymous token, trying global token`);
     }
     
     if (!storedData) {
-        console.log(`No stored token found for session ${sessionId} or global`);
         return false;
     }
-    
-    // Check if token matches and is not expired (1 hour validity)
-    const isValid = storedData.token === token && 
-                   (Date.now() - storedData.createdAt) < 3600000;
-    
-    if (isValid) {
-        console.log(`CSRF token validation successful for session ${sessionId}`);
-    } else {
-        console.log(`CSRF token validation failed for session ${sessionId}`);
-        console.log(`Token match: ${storedData.token === token}`);
-        console.log(`Client token: ${token ? token.substring(0, 8) + '...' : 'undefined'}`);
-        console.log(`Server token: ${storedData.token ? storedData.token.substring(0, 8) + '...' : 'undefined'}`);
-        console.log(`Token age: ${(Date.now() - storedData.createdAt) / 1000} seconds`);
-    }
-    
-    return isValid;
 }
 
 /**
@@ -115,7 +96,6 @@ function csrfGenerator(req, res, next) {
     if (existingData && (Date.now() - existingData.createdAt) < 3600000) {
         // Use existing token if it's not expired
         token = existingData.token;
-        console.log(`Using existing CSRF token for session ${sessionId}: ${token.substring(0, 8)}...`);
     } else {
         // Generate a new token
         token = generateToken(sessionId);
@@ -132,8 +112,6 @@ function csrfGenerator(req, res, next) {
         secure: process.env.NODE_ENV === 'production',
         path: '/'
     });
-    
-    console.log(`CSRF token set in cookie for session ${sessionId}: ${token.substring(0, 8)}...`);
     
     next();
 }
@@ -157,49 +135,31 @@ function csrfProtection(req, res, next) {
                  req.headers['x-xsrf-token'] ||
                  req.cookies?.['XSRF-TOKEN']; // Also check cookies directly
     
-    console.log(`CSRF validation for ${req.method} ${req.originalUrl}`);
-    console.log(`Session ID: ${sessionId}`);
-    console.log(`Token present: ${token ? 'Yes' : 'No'}`);
-    
     if (!token) {
-        console.log('CSRF token missing in request');
-        console.log('Headers:', JSON.stringify(req.headers));
-        console.log('Body:', JSON.stringify(req.body));
-        console.log('Query:', JSON.stringify(req.query));
-        console.log('Cookies:', JSON.stringify(req.cookies));
         return res.status(403).json({
             error: 'CSRF token missing'
         });
     }
-    
-    // For debugging: check if token exists in our store
-    const allSessionIds = Array.from(csrfTokens.keys());
-    console.log(`Available sessions in token store: ${allSessionIds.join(', ')}`);
-    
+
     // For admin login, temporarily disable CSRF protection
     // This is a workaround for the CSRF token validation issues
     if (req.originalUrl === '/auth/admin/login') {
-        console.log('Admin login detected - bypassing CSRF validation for now');
         return next();
     }
     
     // Try to validate with different session IDs if needed
     if (!validateToken(sessionId, token)) {
-        console.log(`Token validation failed for session ${sessionId}, trying anonymous session`);
         
         if (!validateToken('anonymous', token)) {
-            console.log(`Token validation failed for anonymous session, trying global token`);
             
             if (!validateToken('global', token)) {
-                console.log('CSRF validation failed for all possible sessions');
                 return res.status(403).json({
                     error: 'CSRF token validation failed'
                 });
             }
         }
     }
-    
-    console.log('CSRF token validation successful');
+
     next();
 }
 

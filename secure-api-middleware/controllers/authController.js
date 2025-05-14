@@ -22,7 +22,6 @@ const { sanitizeUsername, sanitizeEmail, sanitizeString } = require("../utils/sa
  */
 async function registerUser(req, res) {
     try {
-        console.log('Registration request received:', { username: req.body.username });
         
         // Sanitize inputs
         const username = sanitizeUsername(req.body.username);
@@ -43,14 +42,12 @@ async function registerUser(req, res) {
         // Check if username already exists
         const existingUser = await UserDAO.findByUsername(username);
         if (existingUser) {
-            console.log('Registration failed: Username already exists:', username);
             return res.status(400).json({ error: "Username already exists" });
         }
         
         // Check if email already exists
         const existingEmail = await UserDAO.findByEmail(email);
         if (existingEmail) {
-            console.log('Registration failed: Email already exists:', email);
             return res.status(400).json({ error: "Email already in use" });
         }
         
@@ -63,7 +60,6 @@ async function registerUser(req, res) {
             last_name
         });
         
-        console.log('User registered successfully:', { id: newUser.id, username });
         
         // Generate verification token
         const verificationToken = tokenService.generateVerificationToken({
@@ -109,7 +105,6 @@ async function registerUser(req, res) {
  */
 async function loginUser(req, res) {
     try {
-        console.log('Login request received:', { username: req.body.username });
         
         // Sanitize username before processing
         const username = sanitizeUsername(req.body.username);
@@ -132,7 +127,6 @@ async function loginUser(req, res) {
 
         // User not found
         if (!user) {
-            console.log('Login failed: User not found:', username);
             
             // Log failed login attempt
             securityLogger.logSecurityViolation('login_failure', {
@@ -143,14 +137,11 @@ async function loginUser(req, res) {
             
             return res.status(401).json({ error: "Invalid username or password" });
         }
-
-        console.log('User found, verifying password');
         
         // Verify password using bcrypt compare
         const passwordMatch = await bcrypt.compare(password, user.password_hash);
 
         if (!passwordMatch) {
-            console.log('Login failed: Password mismatch for user:', username);
             
             // Log failed login attempt
             securityLogger.logSecurityViolation('login_failure', {
@@ -166,7 +157,6 @@ async function loginUser(req, res) {
         // Check if email is verified
         const isVerified = await UserDAO.isEmailVerified(user.id);
         if (!isVerified) {
-            console.log('Login blocked: Email not verified for user:', username);
             
             // Log verification required
             securityLogger.logAuthEvent('login_verification_required', {
@@ -830,7 +820,6 @@ async function verifyPasswordChange(req, res) {
  */
 async function adminLogin(req, res) {
   try {
-    console.log('Admin login attempt received');
     
     const { username, password } = req.body;
     
@@ -843,7 +832,6 @@ async function adminLogin(req, res) {
     
     // Basic validation
     if (!username || !password) {
-      console.log('Admin login failed: Missing username or password');
       securityLogger.logSecurityViolation('invalid_admin_login', {
         reason: 'Missing username or password',
         ip: req.ip
@@ -859,7 +847,6 @@ async function adminLogin(req, res) {
     
     // Validate admin credentials
     if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
-      console.log('Admin login successful');
       
       // Log successful login
       securityLogger.logAuthEvent('admin_login_success', {
@@ -890,9 +877,6 @@ async function adminLogin(req, res) {
         isAdmin: true
       });
     }
-    
-    // Return error for invalid credentials
-    console.log('Admin login failed: Invalid credentials');
     
     // Log failed login attempt
     securityLogger.logSecurityViolation('admin_login_failure', {

@@ -9,7 +9,18 @@ require('dotenv').config();
 const EMAIL_USER = process.env.EMAIL_USER;
 const EMAIL_PASSWORD = process.env.EMAIL_PASSWORD;
 const EMAIL_FROM = process.env.EMAIL_FROM || 'TravelTales <noreply@traveltales.com>';
-const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
+
+// Define base URLs for different environments
+const PRODUCTION_URL = 'https://traveltalesblog.netlify.app';
+const DEVELOPMENT_URL = 'http://localhost:3000';
+
+// Determine which base URL to use based on environment
+const BASE_URL = process.env.NODE_ENV === 'production' 
+  ? (process.env.FRONTEND_URL || PRODUCTION_URL)
+  : (process.env.BASE_URL || DEVELOPMENT_URL);
+
+console.log(`Mail service configured with base URL: ${BASE_URL}`);
+
 const SKIP_EMAIL_VERIFICATION = process.env.SKIP_EMAIL_VERIFICATION === 'true';
 
 // Create a nodemailer transporter using environment variables
@@ -20,6 +31,9 @@ if (!EMAIL_USER || !EMAIL_PASSWORD || SKIP_EMAIL_VERIFICATION) {
   // Use a fake transporter that doesn't actually send emails
   transporter = {
     sendMail: async (options) => {
+      console.log(`[DEV MODE] Email would be sent to: ${options.to}`);
+      console.log(`[DEV MODE] Subject: ${options.subject}`);
+      console.log(`[DEV MODE] Links would use base URL: ${BASE_URL}`);
       return { messageId: 'fake-message-id-' + Date.now() };
     }
   };
@@ -32,7 +46,7 @@ if (!EMAIL_USER || !EMAIL_PASSWORD || SKIP_EMAIL_VERIFICATION) {
       pass: EMAIL_PASSWORD
     },
     tls: {
-      rejectUnauthorized: false // For development environments
+      rejectUnauthorized: process.env.NODE_ENV === 'production' // Set to true in production
     }
   });
 }

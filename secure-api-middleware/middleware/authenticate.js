@@ -25,21 +25,15 @@ module.exports = (req, res, next) => {
     // First try to get token from HttpOnly cookie
     let token = req.cookies?.auth_token;
     
-    console.log('Authentication middleware called');
-    console.log('Cookies present:', req.cookies ? Object.keys(req.cookies) : 'No cookies');
-    console.log('Auth cookie present:', !!token);
-    
     // If no token in cookie, try Authorization header as fallback
     if (!token) {
     // Extract token from Authorization header
     // The header format should be: Authorization: Bearer <token>
         token = req.headers.authorization?.split(" ")[1];
-        console.log('Using Authorization header token:', !!token);
     }
 
     // If no token is provided, deny access immediately
     if (!token) {
-        console.log('No token found in cookies or Authorization header');
         return res.status(401).json({ error: "Unauthorized" });
     }
 
@@ -47,16 +41,11 @@ module.exports = (req, res, next) => {
     jwt.verify(token, process.env.JWT_SECRET || 'fallback-jwt-secret', (err, decoded) => {
         // If verification fails (invalid or expired token), deny access
         if (err) {
-            console.log('Token verification failed:', err.message);
             return res.status(403).json({ error: "Invalid token" });
         }
         
-        // Log decoded token (without sensitive info)
-        console.log('Token verified successfully. User:', decoded.username, 'Admin:', decoded.isAdmin || false);
-        
         // Check for admin claim in token
         if (decoded.isAdmin === true) {
-            console.log('Admin access granted');
             req.user = { id: 0, username: 'admin', isAdmin: true };
             return next();
         }

@@ -25,6 +25,16 @@ const UserDAO = require('./models/UserDAO');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Log environment information
+const isProduction = process.env.NODE_ENV === 'production';
+console.log(`
+==================================
+Server Environment: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}
+Frontend URL: ${isProduction ? 'https://traveltalesblog.netlify.app' : 'http://localhost:3000'}
+API URL: ${isProduction ? 'https://countryapi-production-5484.up.railway.app' : `http://localhost:${PORT}`}
+==================================
+`);
+
 // Security middleware
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
