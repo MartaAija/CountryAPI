@@ -1,46 +1,73 @@
-version: '3'
+version: '3.8'
 
 services:
-  client:
-    build: ./client
-    ports:
-      - "3000:3000"
-    depends_on:
-      - server
-    environment:
-      - REACT_APP_ADMIN_USERNAME=admin
-      - REACT_APP_ADMIN_PASSWORD=admin1234
-    volumes:
-      - ./client:/app
-      - /app/node_modules
-
-  server:
-    build: ./secure-api-middleware
+  # Backend API service
+  api:
+    build:
+      context: ./secure-api-middleware
+      dockerfile: dockerfile
+    container_name: country-explorer-api
+    restart: always
     ports:
       - "5000:5000"
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - JWT_SECRET=${JWT_SECRET}
+      - ADMIN_USERNAME=${ADMIN_USERNAME}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - DB_HOST=${DB_HOST}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - EMAIL_SERVICE=${EMAIL_SERVICE}
+      - EMAIL_USER=${EMAIL_USER}
+      - EMAIL_PASSWORD=${EMAIL_PASSWORD}
+    volumes:
+      - ./secure-api-middleware/logs:/app/logs
+    networks:
+      - country-explorer-network
     depends_on:
       - db
-    environment:
-      - DB_HOST=db
-      - DB_USER=user
-      - DB_PASSWORD=password123
-      - DB_NAME=country_api
-      - JWT_SECRET=uT5x8zP3qR7vW2yA6bN1cM9dF4gH7jK2
-    volumes:
-      - ./secure-api-middleware:/app
-      - /app/node_modules
 
+  # Frontend client service
+  client:
+    build:
+      context: ./client
+      dockerfile: dockerfile
+    container_name: country-explorer-client
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://api:5000
+      - NODE_ENV=production
+    networks:
+      - country-explorer-network
+    depends_on:
+      - api
+
+  # Database service
   db:
     image: mysql:8.0
+    container_name: country-explorer-db
+    restart: always
     ports:
       - "3306:3306"
     environment:
-      - MYSQL_ROOT_PASSWORD=rootpassword
-      - MYSQL_DATABASE=country_api
-      - MYSQL_USER=user
-      - MYSQL_PASSWORD=password123
+      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${DB_NAME}
+      - MYSQL_USER=${DB_USER}
+      - MYSQL_PASSWORD=${DB_PASSWORD}
     volumes:
-      - mysql_data:/var/lib/mysql
+      - mysql-data:/var/lib/mysql
+    networks:
+      - country-explorer-network
+    command: --default-authentication-plugin=mysql_native_password
+
+networks:
+  country-explorer-network:
+    driver: bridge
 
 volumes:
-  mysql_data:
+  mysql-data:

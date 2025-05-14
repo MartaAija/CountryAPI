@@ -1,58 +1,57 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { loginUser } from '../services/authApi';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import '../../App.css';
+import apiClient, { formatErrorMessage } from '../../utils/apiClient';
 
 // Login component handles user authentication with username/password
-// Supports both regular user and admin authentication flows
 function Login() {
-    // State for form fields and error messages
+    // State for form fields and error handling
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
+    const [isLoading, setIsLoading] = useState(false);
+    
     const navigate = useNavigate();
+    const location = useLocation();
+    
+    // Get the path user was trying to access before being redirected to login
+    const from = location.state?.from || "/dashboard";
 
     // Handle form submission and authentication logic
     const handleLogin = async (e) => {
         e.preventDefault();
         setError("");
-        
+        setIsLoading(true);
+
         try {
-            // First clear any existing auth tokens
-            localStorage.clear();
+            // Use apiClient instead of direct axios
+            const response = await apiClient.post('/auth/login', {
+                username,
+                password
+            });
+
+            // Store token and user info in localStorage
+            localStorage.setItem('token', response.data.token);
+            localStorage.setItem('userId', response.data.userId);
+            localStorage.setItem('username', response.data.username);
             
-            // Special case: Admin authentication with hardcoded credentials
-            // In production, this would typically use a secure authentication endpoint
-            if (username === process.env.REACT_APP_ADMIN_USERNAME && 
-                password === process.env.REACT_APP_ADMIN_PASSWORD) {
-                localStorage.setItem('isAdmin', 'true');
-                localStorage.setItem('token', 'admin-token');
-                
-                // Trigger storage event to update the navbar immediately
-                window.dispatchEvent(new Event('storage'));
-                
-                // Short delay before navigation to ensure auth state is properly set
-                setTimeout(() => {
-                    navigate('/admin');
-                }, 100);
+            // Check if user is verified
+            if (response.data.verified === false) {
+                // Redirect to verification needed page
+                navigate('/verify-email-needed');
                 return;
             }
 
-            // Regular user authentication via API
-            const response = await loginUser(username, password);
-            localStorage.setItem('token', response.data.token);
-            localStorage.setItem('isAdmin', 'false');
+            // Trigger storage event for components listening to auth changes
+            window.dispatchEvent(new Event('storage'));
             
-            // Dispatch custom event
-            window.dispatchEvent(new Event('auth-change'));
-            
-            // Then navigate after a delay
-            setTimeout(() => {
-                navigate('/dashboard');
-            }, 100);
+            // Redirect user to dashboard or the page they were trying to access
+            navigate(from);
         } catch (error) {
-            // Display error message from API or a fallback message
-            setError(error.response?.data?.error || "Login failed");
+            console.error('Login error:', error);
+            setError(formatErrorMessage(error));
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -61,8 +60,8 @@ function Login() {
         <div className="page-container">
             <div className="form-container">
                 <div className="page-header">
-                    <h2 className="page-title">Welcome Back</h2>
-                    <p className="page-subtitle">Log in to access your account</p>
+                    <h2 className="page-title">Login</h2>
+                    <p className="page-subtitle">Sign in to your account</p>
                 </div>
 
                 {/* Display error message if authentication fails */}
@@ -78,6 +77,7 @@ function Login() {
                             onChange={(e) => setUsername(e.target.value)} 
                             placeholder="Enter username"
                             required 
+                            disabled={isLoading}
                         />
                     </div>
 
@@ -89,11 +89,12 @@ function Login() {
                             onChange={(e) => setPassword(e.target.value)} 
                             placeholder="Enter password"
                             required 
+                            disabled={isLoading}
                         />
                     </div>
 
-                    <button type="submit" className="btn btn-primary">
-                        Log In
+                    <button type="submit" className="btn btn-primary" disabled={isLoading}>
+                        {isLoading ? 'Logging in...' : 'Login'}
                     </button>
                 </form>
 

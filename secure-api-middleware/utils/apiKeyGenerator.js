@@ -2,16 +2,21 @@
  * API Key Generator Utility
  * Handles generation, tracking, and cooldown of API keys.
  */
+const crypto = require('crypto');
 
 // Track API key regeneration timestamps per user and key type
 const lastKeyRegeneration = {};
 
 /**
- * Generates a random API key
- * Creates a 30-character random string using alphanumeric characters
+ * Generates a cryptographically secure API key
+ * Creates a 30-character random string using crypto for security
  */
 function generateApiKey() {
-    return [...Array(30)].map(() => Math.random().toString(36)[2]).join("");
+    // Generate 15 bytes of random data (which will become 30 hex characters)
+    const randomBytes = crypto.randomBytes(15);
+    
+    // Convert to a hexadecimal string
+    return randomBytes.toString('hex');
 }
 
 /**

@@ -10,15 +10,16 @@ function Logout() {
     // Perform logout actions immediately when component mounts
     useEffect(() => {
         // Clear all authentication data from localStorage
-        // This removes token, admin status, and any other auth-related items
         localStorage.removeItem('token');
+        localStorage.removeItem('userId');
+        localStorage.removeItem('activeApiKey');
         localStorage.removeItem('isAdmin');
         
-        // Dispatch custom event
+        // Dispatch custom event to update UI
         window.dispatchEvent(new Event('auth-change'));
         
-        // Navigate or reload
-        window.location.href = '/login';
+        // Navigate to login page
+        navigate('/login');
     }, [navigate]);
 
     // Component doesn't render any visible UI

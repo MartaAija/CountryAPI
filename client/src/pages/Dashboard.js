@@ -1,9 +1,9 @@
 // Dashboard component provides a search interface for users to access and filter country data
 // Uses the active API key to fetch country information through the secure middleware
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import axios from 'axios';
+import apiClient, { formatErrorMessage } from '../utils/apiClient';
 import '../App.css';
-import config from '../config';
+import { isAuthenticated } from '../utils/authService';
 
 function Dashboard() {
     // State management for search functionality and data display
@@ -42,22 +42,25 @@ function Dashboard() {
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
-    // Fetch all countries using the provided API key - converted to useCallback
+    // Fetch all countries using the backend API - converted to useCallback
     const fetchAllCountries = useCallback(async (apiKey) => {
         setLoading(true);
         setError('');
         try {       
-            const response = await axios.get(`${config.apiBaseUrl}/api/countries/all`, {
+            // Use our backend API with apiClient
+            const response = await apiClient.get('/countries', {
                 headers: { 
                     'X-API-Key': apiKey
                 }
             });
-            // Sort data in the current ascending order - this won't change based on sortOrder
-            const sortedData = [...response.data].sort((a, b) => a.name.localeCompare(b.name));
+            
+            // Data is already formatted by our backend
+            const sortedData = response.data;
             setCountryData(sortedData);
             setFilteredData(sortedData);
         } catch (error) {
-            handleApiError(error);
+            console.error('Error fetching countries:', error);
+            setError(formatErrorMessage(error));
         } finally {
             setLoading(false);
         }
@@ -67,9 +70,15 @@ function Dashboard() {
     useEffect(() => {
         const fetchApiKey = async () => {
             try {
-                const response = await axios.get(`${config.apiBaseUrl}/auth/profile`, {
-                    headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-                });
+                // Check authentication status first
+                const authenticated = await isAuthenticated();
+                if (!authenticated) {
+                    setError('Authentication required. Please login to access this feature.');
+                    return;
+                }
+                
+                // Use apiClient for fetching profile
+                const response = await apiClient.get('/auth/profile');
                 
                 // Try primary key first, then secondary if primary is not active
                 if (response.data.api_key_primary && response.data.is_active_primary) {
@@ -82,7 +91,8 @@ function Dashboard() {
                     setError('No active API key found. Please generate and activate an API key in Settings.');
                 }
             } catch (error) {
-                setError('Failed to fetch API key');
+                console.error('Failed to fetch profile:', error);
+                setError(formatErrorMessage(error));
             }
         };
 
@@ -168,7 +178,7 @@ function Dashboard() {
         if (error.response?.status === 401) {
             setError('Invalid or inactive API key. Please check your API key in Settings.');
         } else {
-            setError('Failed to fetch country data');
+            setError(formatErrorMessage(error));
         }
     };
 
@@ -447,9 +457,9 @@ function Dashboard() {
             </div>
 
             {/* Search message for user guidance */}
-            {error && <div className="message search-message"> Start searching with your API Key...🔍</div>}
+            {error && <div className="message error-message">{error}</div>}
 
-            {/* Loading indicator - fix the conditional rendering */}
+            {/* Loading indicator */}
             {loading && (
                 <div className="loading-spinner">
                     <p>Loading countries...</p>
@@ -468,35 +478,35 @@ function Dashboard() {
             <div className="countries-grid">
                 {filteredData && filteredData.length > 0 ? (
                     filteredData.map((country, index) => (
-                <div key={index} className="country-card">
-                    <h3>{country.name}</h3>
-                    <img src={country.flag} alt={`Flag of ${country.name}`} className="country-flag" />
-                    
-                    <div className="country-info">
+                        <div key={index} className="country-card">
+                            <h3>{country.name}</h3>
+                            <img src={country.flag} alt={`Flag of ${country.name}`} className="country-flag" />
+                            
+                            <div className="country-info">
                                 <div className="info-row">
                                     <strong>Capital:</strong>
                                     <span>{country.capital || 'N/A'}</span>
                                 </div>
                         
                                 <div className="info-row">
-                            <strong>Currency:</strong>
+                                    <strong>Currency:</strong>
                                     {country.currency ? (
-                                        <span className="currency-details">
+                                        <span>
                                             {country.currency.name} ({country.currency.code} {country.currency.symbol})
                                         </span>
                                     ) : (
                                         <span>No currency data available</span>
-                            )}
-                        </div>
+                                    )}
+                                </div>
 
                                 <div className="info-row">
-                            <strong>Languages:</strong>
+                                    <strong>Languages:</strong>
                                     {country.languages && country.languages.length > 0 ? (
-                                        <span className="language-list">
-                                {country.languages.map((lang, idx) => (
+                                        <div className="language-list">
+                                            {country.languages.map((lang, idx) => (
                                                 <span key={idx} className="language-pill">{lang}</span>
                                             ))}
-                                        </span>
+                                        </div>
                                     ) : (
                                         <span>No languages available</span>
                                     )}
@@ -509,7 +519,7 @@ function Dashboard() {
                         <p>No countries found matching "{searchQuery}". Please try a different search term.</p>
                     </div>
                 ) : null}
-                </div>
+            </div>
 
             {/* Back to top button - appears when scrolling down */}
             <button 

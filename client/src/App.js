@@ -10,28 +10,42 @@ import Admin from './pages/admin/Admin';
 import AdminLogin from './pages/admin/AdminLogin';
 import Logout from './pages/auth/Logout';
 import ForgotPassword from './pages/auth/ForgotPassword';
+import ResetPassword from './pages/auth/ResetPassword';
+import VerifyEmail from './pages/VerifyEmail';
+import BlogList from './pages/blog/BlogList';
+import BlogForm from './pages/blog/BlogForm';
+import PostView from './pages/blog/PostView';
+import UserProfile from './pages/blog/UserProfile';
+import FeedPage from './pages/blog/FeedPage';
 import './App.css';
 
-function App() {
-  // Check if user is authenticated by looking for a token in localStorage
-  const isAuthenticated = () => {
-    return !!localStorage.getItem('token');
-  };
+// Custom component for protected routes that redirects unauthenticated users to login
+// Takes an optional adminRequired parameter to restrict routes to admin users only
+const PrivateRoute = ({ children, adminRequired = false }) => {
+  // Check if user is authenticated
+  const isAuthenticated = localStorage.getItem('token') !== null;
 
   // Check if user has admin privileges
-  const isAdmin = () => {
-    return !!localStorage.getItem('isAdmin');
-  };
+  const isAdmin = localStorage.getItem('isAdmin') === 'true';
 
-  // Custom component for protected routes that redirects unauthenticated users to login
-  // Takes an optional adminRequired parameter to restrict routes to admin users only
-  const PrivateRoute = ({ children, adminRequired = false }) => {
+  // For admin routes, check both authentication and admin status
     if (adminRequired) {
-      return isAdmin() ? children : <Navigate to="/login" />;
+    if (!isAuthenticated) {
+      return <Navigate to="/login" />;
     }
-    return isAuthenticated() ? children : <Navigate to="/login" />;
+    
+    if (!isAdmin) {
+      return <Navigate to="/dashboard" />;
+    }
+    
+    return children;
+  }
+  
+  // For regular protected routes, just check authentication
+  return isAuthenticated ? children : <Navigate to="/login" />;
   };
 
+function App() {
   return (
     <div className="app-container">
       <Navbar />
@@ -44,6 +58,10 @@ function App() {
           <Route path="/" element={<Navigate to="/home" />} />
           <Route path="/logout" element={<Logout />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/verify-email" element={<VerifyEmail type="verification" />} />
+          <Route path="/verify-password-change" element={<VerifyEmail type="password" />} />
+          <Route path="/verify-email-change" element={<VerifyEmail type="email" />} />
           
           {/* Protected Routes - require authentication */}
           <Route path="/dashboard" element={
@@ -64,6 +82,28 @@ function App() {
             </PrivateRoute>
           } />
           <Route path="/admin-login" element={<AdminLogin />} />
+          
+          {/* Blog routes */}
+          <Route path="/blog" element={<BlogList />} />
+          <Route path="/blog/post/:id" element={<PostView />} />
+          <Route path="/blog/user/:userId" element={<UserProfile />} />
+          
+          {/* Protected blog routes */}
+          <Route path="/blog/create" element={
+            <PrivateRoute>
+              <BlogForm />
+            </PrivateRoute>
+          } />
+          <Route path="/blog/edit/:id" element={
+            <PrivateRoute>
+              <BlogForm />
+            </PrivateRoute>
+          } />
+          <Route path="/blog/feed" element={
+            <PrivateRoute>
+              <FeedPage />
+            </PrivateRoute>
+          } />
         </Routes>
       </main>
     </div>

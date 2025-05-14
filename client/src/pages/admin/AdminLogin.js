@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { adminLogin } from '../../utils/authService';
 import '../../App.css';
 
 // AdminLogin component - provides a specialized login interface for administrators
@@ -9,33 +10,26 @@ function AdminLogin() {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
+    const [isLoading, setIsLoading] = useState(false);
     const navigate = useNavigate();
 
     // Handle admin login form submission and authentication
     const handleAdminLogin = async (e) => {
         e.preventDefault();
         setError("");
+        setIsLoading(true);
         
-        // Check against environment variables
-        if (username === process.env.REACT_APP_ADMIN_USERNAME && 
-            password === process.env.REACT_APP_ADMIN_PASSWORD) {
-            // Ensure clean authentication state by clearing existing tokens
-            localStorage.clear();
+        try {
+            // Use the adminLogin utility function
+            await adminLogin(username, password);
             
-            // Set authentication state for admin access
-            localStorage.setItem('isAdmin', 'true');
-            localStorage.setItem('token', 'admin-token');
-            
-            // Trigger storage event to update the navbar without page refresh
-            window.dispatchEvent(new Event('storage'));
-            
-            // Short delay before navigation to ensure auth state is properly set
-            setTimeout(() => {
-                navigate('/admin');
-            }, 100);
-        } else {
-            // Show error message for invalid credentials
-            setError("Invalid admin credentials");
+            // Navigate to admin dashboard on success
+            navigate('/admin');
+        } catch (error) {
+            console.error('Login error:', error);
+            setError(error.response?.data?.error || "Login failed. Please try again.");
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -62,6 +56,7 @@ function AdminLogin() {
                             onChange={(e) => setUsername(e.target.value)} 
                             placeholder="Admin username"
                             required 
+                            disabled={isLoading}
                         />
                     </div>
 
@@ -73,12 +68,17 @@ function AdminLogin() {
                             onChange={(e) => setPassword(e.target.value)} 
                             placeholder="Admin password"
                             required 
+                            disabled={isLoading}
                         />
                     </div>
 
                     {/* Login submission button */}
-                    <button type="submit" className="btn btn-primary">
-                        Login as Admin
+                    <button 
+                        type="submit" 
+                        className="btn btn-primary"
+                        disabled={isLoading}
+                    >
+                        {isLoading ? 'Logging in...' : 'Login as Admin'}
                     </button>
                 </form>
             </div>

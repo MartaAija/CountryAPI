@@ -9,66 +9,96 @@
 
 const bcrypt = require("bcryptjs");      // Library for password hashing
 const jwt = require("jsonwebtoken");      // JWT for stateless authentication
-const db = require("../config/db");       // Database connection pool
-const { generateApiKey, checkCooldown, updateCooldown } = require("../utils/apiKeyGenerator"); // API key utilities
+const UserDAO = require("../models/UserDAO");  // User Data Access Object
+const { checkCooldown, updateCooldown } = require("../utils/apiKeyGenerator"); // API key utilities
+const mailService = require("../utils/mailService"); // Email service
+const tokenService = require("../utils/tokenService"); // Token service
+const securityLogger = require("../utils/logger"); // Security logger
+const { sanitizeUsername, sanitizeEmail, sanitizeString } = require("../utils/sanitizer"); // Input sanitization
 
 /**
  * User Registration Handler
- * Creates a new user account with:
- * - Hashed password for security
- * - Initial primary API key generation
- * - Basic profile information storage
+ * Creates a new user account with hashed password and sends verification email
  */
 async function registerUser(req, res) {
     try {
+        console.log('Registration request received:', { username: req.body.username });
         
-        const { username, password, first_name, last_name } = req.body;
+        // Sanitize inputs
+        const username = sanitizeUsername(req.body.username);
+        const email = sanitizeEmail(req.body.email);
+        const first_name = sanitizeString(req.body.first_name);
+        const last_name = sanitizeString(req.body.last_name);
+        const password = req.body.password; // Don't sanitize passwords as they will be hashed
         
-        // Input validation - ensure all required fields are provided
-        if (!username || !password || !first_name || !last_name) {
-            return res.status(400).json({ error: "All fields are required" });
+        // Validate sanitized inputs
+        if (!username || username !== req.body.username) {
+            return res.status(400).json({ error: "Invalid username format" });
         }
-
-        // Check for duplicate usernames to prevent conflicts
-        const [existingUser] = await db.query(
-            "SELECT username FROM users WHERE username = ?", 
-            [username]
+        
+        if (!email || email !== req.body.email.trim().toLowerCase()) {
+            return res.status(400).json({ error: "Invalid email format" });
+        }
+        
+        // Check if username already exists
+        const existingUser = await UserDAO.findByUsername(username);
+        if (existingUser) {
+            console.log('Registration failed: Username already exists:', username);
+            return res.status(400).json({ error: "Username already exists" });
+        }
+        
+        // Check if email already exists
+        const existingEmail = await UserDAO.findByEmail(email);
+        if (existingEmail) {
+            console.log('Registration failed: Email already exists:', email);
+            return res.status(400).json({ error: "Email already in use" });
+        }
+        
+        // Create new user record with is_verified set to false
+        const newUser = await UserDAO.registerUser({
+            username,
+            password,
+            email,
+            first_name,
+            last_name
+        });
+        
+        console.log('User registered successfully:', { id: newUser.id, username });
+        
+        // Generate verification token
+        const verificationToken = tokenService.generateVerificationToken({
+            userId: newUser.id,
+            email: newUser.email
+        });
+        
+        // Store token in database
+        await UserDAO.createVerificationToken(newUser.id, verificationToken);
+        
+        // Send verification email
+        const emailResult = await mailService.sendVerificationEmail(email, verificationToken, newUser.id);
+        if (!emailResult.success) {
+            // Log the error but continue with registration
+            console.log('Warning: Verification email could not be sent:', emailResult.error);
+        }
+        
+        // Generate token for immediate login, but with short expiry
+        const token = jwt.sign(
+            { id: newUser.id, username: newUser.username },
+            process.env.JWT_SECRET,
+            { expiresIn: "15m" } // Short expiry until verified
         );
         
-        if (existingUser.length > 0) {
-            return res.status(400).json({ 
-                error: "Username already exists. Please choose a different username." 
-            });
-        }
-
-        // Security: Hash password with bcrypt before storing
-        // The salt (10 rounds) is automatically generated and stored with the hash
-        const hashedPassword = await bcrypt.hash(password, 10);
-        
-        // Generate initial API key for the user
-        const apiKey = generateApiKey();
-
-        // Insert new user with primary API key
-        // Note: Using parameterized query for SQL injection prevention
-        const sql = `
-            INSERT INTO users (
-                username, password_hash, first_name, last_name,
-                api_key_primary, is_active_primary, created_at_primary
-            ) VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
-        `;
-        
-        const values = [username, hashedPassword, first_name, last_name, apiKey];
-
-        // Execute the insert operation
-        const [result] = await db.query(sql, values);
-
-        // Return success response with the generated API key
+        // Return success with user ID and token
         res.status(201).json({ 
-            message: "User registered successfully!", 
-            apiKey 
+            message: "User registered successfully. Please check your email to verify your account.",
+            userId: newUser.id,
+            username: newUser.username,
+            token,
+            verified: false
         });
     } catch (err) {
         // Error handling with specific error message
+        console.error('Registration error:', err);
         res.status(500).json({ error: "Database error: " + err.message });
     }
 }
@@ -79,61 +109,338 @@ async function registerUser(req, res) {
  */
 async function loginUser(req, res) {
     try {
-        const { username, password } = req.body;
+        console.log('Login request received:', { username: req.body.username });
+        
+        // Sanitize username before processing
+        const username = sanitizeUsername(req.body.username);
+        const password = req.body.password; // Don't sanitize passwords
+        
+        // Validate sanitized username
+        if (!username || username !== req.body.username) {
+            return res.status(401).json({ error: "Invalid username format" });
+        }
+        
+        // Log login attempt
+        securityLogger.logAuthEvent('login_attempt', {
+            username,
+            ip: req.ip,
+            userAgent: req.headers['user-agent']
+        });
         
         // Find user by username
-        const [rows] = await db.query("SELECT * FROM users WHERE username = ?", [username]);
+        const user = await UserDAO.findByUsername(username);
 
         // User not found
-        if (rows.length === 0) {
+        if (!user) {
+            console.log('Login failed: User not found:', username);
+            
+            // Log failed login attempt
+            securityLogger.logSecurityViolation('login_failure', {
+                username,
+                reason: 'User not found',
+                ip: req.ip
+            });
+            
             return res.status(401).json({ error: "Invalid username or password" });
         }
 
-        const user = rows[0];
+        console.log('User found, verifying password');
         
         // Verify password using bcrypt compare
-        // This checks if the provided password matches the stored hash
         const passwordMatch = await bcrypt.compare(password, user.password_hash);
 
         if (!passwordMatch) {
+            console.log('Login failed: Password mismatch for user:', username);
+            
+            // Log failed login attempt
+            securityLogger.logSecurityViolation('login_failure', {
+                username,
+                userId: user.id,
+                reason: 'Password mismatch',
+                ip: req.ip
+            });
+            
             return res.status(401).json({ error: "Invalid credentials" });
         }
 
+        // Check if email is verified
+        const isVerified = await UserDAO.isEmailVerified(user.id);
+        if (!isVerified) {
+            console.log('Login blocked: Email not verified for user:', username);
+            
+            // Log verification required
+            securityLogger.logAuthEvent('login_verification_required', {
+                username,
+                userId: user.id,
+                ip: req.ip
+            });
+            
+            return res.status(403).json({ 
+                error: "Email not verified. Please check your inbox and verify your email before logging in."
+            });
+        }
+
+        console.log('Password verified, generating token');
+
         // Create JWT token with user information
-        // This token will be used for authentication in subsequent requests
         const token = jwt.sign(
             { id: user.id, username: user.username }, 
-            process.env.JWT_SECRET,
-            { expiresIn: "1h" } // Token expires in 1 hour for security
+            process.env.JWT_SECRET || 'fallback-jwt-secret',
+            { expiresIn: "1h" } // Normal expiry for verified users
         );
+        
+        // Set token in HttpOnly cookie
+        res.cookie('auth_token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+            maxAge: 3600000 // 1 hour
+        });
 
-        // Return success with token
-        res.json({ message: "Login successful!", token });
+        console.log('Login successful for user:', username);
+        
+        // Log successful login
+        securityLogger.logAuthEvent('login_success', {
+            username,
+            userId: user.id,
+            ip: req.ip
+        });
+        
+        // Return success with token and userId (for backward compatibility)
+        res.json({ 
+            message: "Login successful!", 
+            token,
+            userId: user.id,
+            username: user.username,
+            verified: true
+        });
     } catch (err) {
-        res.status(500).json({ error: "Database error" });
+        console.error('Login error:', err);
+        
+        // Log error
+        securityLogger.logSecurityViolation('login_error', {
+            error: err.message,
+            ip: req.ip
+        });
+        
+        res.status(500).json({ error: "Database error: " + err.message });
+    }
+}
+
+/**
+ * Email Verification Handler
+ * Verifies a user's email address using the token sent to their email
+ */
+async function verifyEmail(req, res) {
+    try {
+        const { token, userId } = req.query;
+        
+        console.log('Verification request received:', { userId, tokenLength: token?.length });
+        
+        if (!token || !userId) {
+            console.log('Missing token or userId in request');
+            return res.status(400).json({ error: "Missing token or userId" });
+        }
+        
+        // First check if the user is already verified
+        console.log('Checking if user is already verified:', userId);
+        const isAlreadyVerified = await UserDAO.isEmailVerified(userId);
+        console.log('Is user already verified:', isAlreadyVerified);
+        
+        if (isAlreadyVerified) {
+            // User is already verified, generate a token and return success
+            console.log('User is already verified, finding user details');
+            const user = await UserDAO.findById(userId);
+            if (!user) {
+                console.log('User not found:', userId);
+                return res.status(404).json({ error: "User not found" });
+            }
+            
+            // Generate new token with longer expiry
+            console.log('Generating new token for already verified user');
+            const newToken = jwt.sign(
+                { id: userId, username: user.username },
+                process.env.JWT_SECRET,
+                { expiresIn: "1h" }
+            );
+            
+            return res.json({ 
+                message: "Email already verified. You have full access to your account.",
+                token: newToken,
+                verified: true
+            });
+        }
+        
+        // If not already verified, verify the token
+        console.log('Verifying token for user:', userId);
+        const decoded = tokenService.verifyToken(token, 'email_verification');
+        console.log('Token verification result:', decoded ? 'Valid token' : 'Invalid token');
+        
+        if (!decoded || decoded.userId != userId) {
+            console.log('Token validation failed:', { 
+                decodedUserId: decoded?.userId, 
+                requestUserId: userId,
+                tokenValid: !!decoded
+            });
+            return res.status(400).json({ error: "Invalid or expired verification link" });
+        }
+        
+        // Update user's verification status
+        console.log('Updating user verification status in database');
+        const verified = await UserDAO.verifyEmail(userId, token);
+        console.log('Database update result:', verified ? 'Success' : 'Failed');
+        
+        if (!verified) {
+            console.log('Database verification failed for user:', userId);
+            return res.status(400).json({ error: "Invalid or expired verification link" });
+        }
+        
+        // Generate new token with longer expiry now that email is verified
+        console.log('Generating new token for newly verified user');
+        const newToken = jwt.sign(
+            { id: userId, username: decoded.username },
+            process.env.JWT_SECRET,
+            { expiresIn: "1h" }
+        );
+        
+        console.log('Email verification successful for user:', userId);
+        res.json({ 
+            message: "Email verified successfully. You now have full access to your account.",
+            token: newToken,
+            verified: true
+        });
+    } catch (err) {
+        console.error('Email verification error:', err);
+        res.status(500).json({ error: "Server error: " + err.message });
+    }
+}
+
+/**
+ * Resend Verification Email Handler
+ * Resends the verification email to the user
+ */
+async function resendVerificationEmail(req, res) {
+    try {
+        const userId = req.user.id;
+        
+        // Get user details
+        const user = await UserDAO.findById(userId);
+        if (!user) {
+            return res.status(404).json({ error: "User not found" });
+        }
+        
+        // Check if already verified
+        const isVerified = await UserDAO.isEmailVerified(userId);
+        if (isVerified) {
+            return res.status(400).json({ error: "Email already verified" });
+        }
+        
+        // Generate new verification token
+        const verificationToken = tokenService.generateVerificationToken({
+            userId: user.id,
+            email: user.email
+        });
+        
+        // Update token in database
+        await UserDAO.createVerificationToken(userId, verificationToken);
+        
+        // Send verification email
+        await mailService.sendVerificationEmail(user.email, verificationToken, userId);
+        
+        res.json({ message: "Verification email resent successfully" });
+    } catch (err) {
+        console.error('Resend verification error:', err);
+        res.status(500).json({ error: "Server error: " + err.message });
+    }
+}
+
+/**
+ * Forgot Password Handler
+ * Generates a password reset token and sends reset email
+ */
+async function forgotPassword(req, res) {
+    try {
+        const { email } = req.body;
+        
+        if (!email) {
+            return res.status(400).json({ error: "Email is required" });
+        }
+        
+        // Generate reset token
+        const resetToken = tokenService.generatePasswordResetToken({ email });
+        
+        // Create password reset token in database
+        const user = await UserDAO.createPasswordResetToken(email, resetToken);
+        
+        if (!user) {
+            // Don't reveal if email exists or not for security
+            return res.json({ message: "If your email is registered, you'll receive a password reset link shortly" });
+        }
+        
+        // Send password reset email
+        await mailService.sendPasswordResetEmail(email, resetToken, user.id);
+        
+        res.json({ message: "Password reset instructions sent to your email" });
+    } catch (err) {
+        console.error('Forgot password error:', err);
+        res.status(500).json({ error: "Server error" });
+    }
+}
+
+/**
+ * Reset Password Handler
+ * Validates reset token and updates user's password
+ */
+async function resetPassword(req, res) {
+    try {
+        const { token, userId, password } = req.body;
+        
+        if (!token || !userId || !password) {
+            return res.status(400).json({ error: "Missing required fields" });
+        }
+        
+        // Verify token
+        const decoded = tokenService.verifyToken(token, 'password_reset');
+        if (!decoded) {
+            return res.status(400).json({ error: "Invalid or expired reset link" });
+        }
+        
+        // Verify token in database
+        const user = await UserDAO.verifyPasswordResetToken(userId, token);
+        if (!user) {
+            return res.status(400).json({ error: "Invalid or expired reset link" });
+        }
+        
+        // Hash new password
+        const hashedPassword = await bcrypt.hash(password, 10);
+        
+        // Update password
+        const updated = await UserDAO.resetPassword(userId, hashedPassword);
+        if (!updated) {
+            return res.status(500).json({ error: "Failed to update password" });
+        }
+        
+        // Send confirmation email
+        await mailService.sendPasswordChangeConfirmation(user.email);
+        
+        res.json({ message: "Password reset successful. You can now log in with your new password." });
+    } catch (err) {
+        console.error('Reset password error:', err);
+        res.status(500).json({ error: "Server error" });
     }
 }
 
 // Get User Profile
 async function getUserProfile(req, res) {
     try {
-        const [rows] = await db.query(
-            `SELECT id, username, first_name, last_name,
-                    api_key_primary, is_active_primary, 
-                    DATE_FORMAT(created_at_primary, '%Y-%m-%d %H:%i:%s') AS created_at_primary, 
-                    DATE_FORMAT(last_used_primary, '%Y-%m-%d %H:%i:%s') AS last_used_primary,
-                    api_key_secondary, is_active_secondary, 
-                    DATE_FORMAT(created_at_secondary, '%Y-%m-%d %H:%i:%s') AS created_at_secondary, 
-                    DATE_FORMAT(last_used_secondary, '%Y-%m-%d %H:%i:%s') AS last_used_secondary
-             FROM users WHERE id = ?`, 
-            [req.user.id]
-        );
+        const userId = req.user.id;
+        const user = await UserDAO.getUserWithProfileAndKeys(userId);
         
-        if (rows.length === 0) {
+        if (!user) {
             return res.status(404).json({ error: "User not found" });
         }
 
-        res.json(rows[0]);
+        res.json(user);
     } catch (err) {
         res.status(500).json({ error: "Database error" });
     }
@@ -142,27 +449,18 @@ async function getUserProfile(req, res) {
 // Update User Profile
 async function updateUserProfile(req, res) {
     try {
-        const { first_name, last_name } = req.body;
         const userId = req.user.id;
-
-        if (!first_name || !last_name) {
-            return res.status(400).json({ error: "First name and last name are required" });
+        const { first_name, last_name } = req.body;
+        
+        // Basic validation
+        if (!first_name && !last_name) {
+            return res.status(400).json({ error: "No fields to update" });
         }
-
-        await db.query(
-            "UPDATE users SET first_name = ?, last_name = ? WHERE id = ?",
-            [first_name, last_name, userId]
-        );
-
-        const [updated] = await db.query(
-            "SELECT first_name, last_name FROM users WHERE id = ?",
-            [userId]
-        );
-
-        res.json({ 
-            message: "Profile updated successfully",
-            user: updated[0]
-        });
+        
+        // Update the profile
+        await UserDAO.update(userId, { first_name, last_name });
+        
+        res.json({ message: "Profile updated successfully" });
     } catch (err) {
         res.status(500).json({ error: "Failed to update profile" });
     }
@@ -171,33 +469,126 @@ async function updateUserProfile(req, res) {
 // Change Password
 async function changePassword(req, res) {
     try {
-        const { oldPassword, newPassword } = req.body;
         const userId = req.user.id;
-
-        // Get user's current password hash
-        const [user] = await db.query(
-            "SELECT password_hash FROM users WHERE id = ?", 
-            [userId]
-        );
-
-        if (!user.length) {
-            return res.status(404).json({ error: "User not found" });
+        const { current_password, new_password } = req.body;
+        
+        // Validate input
+        if (!current_password || !new_password) {
+            return res.status(400).json({ error: "Current and new password are required" });
         }
-
-        const passwordMatch = await bcrypt.compare(oldPassword, user[0].password_hash);
+        
+        // Get user
+        const user = await UserDAO.findById(userId);
+        
+        // Verify current password
+        const passwordMatch = await bcrypt.compare(current_password, user.password_hash);
+        
         if (!passwordMatch) {
             return res.status(401).json({ error: "Current password is incorrect" });
         }
 
-        const newPasswordHash = await bcrypt.hash(newPassword, 10);
-        await db.query(
-            "UPDATE users SET password_hash = ? WHERE id = ?",
-            [newPasswordHash, userId]
-        );
+        // Generate password change token
+        const passwordChangeToken = tokenService.generatePasswordChangeToken({
+            userId: user.id,
+            newPassword: new_password
+        });
+        
+        // Store token in database
+        await UserDAO.createPasswordChangeToken(userId, passwordChangeToken);
+        
+        // Send password change verification email
+        await mailService.sendPasswordChangeVerificationEmail(user.email, passwordChangeToken, userId);
 
-        res.json({ message: "Password changed successfully" });
+        res.json({ message: "Password change verification sent to your email" });
     } catch (err) {
-        res.status(500).json({ error: "Failed to change password" });
+        console.error('Password change error:', err);
+        res.status(500).json({ error: "Failed to process password change request" });
+    }
+}
+
+/**
+ * Change Email Handler
+ * Initiates email change process with verification
+ */
+async function changeEmail(req, res) {
+    try {
+        const userId = req.user.id;
+        const { current_email, new_email } = req.body;
+        
+        // Validate input
+        if (!current_email || !new_email) {
+            return res.status(400).json({ error: "Current and new email addresses are required" });
+        }
+        
+        // Get user
+        const user = await UserDAO.findById(userId);
+        
+        // Verify current email matches user's email
+        if (current_email !== user.email) {
+            return res.status(401).json({ error: "Current email does not match your account" });
+        }
+        
+        // Check if new email already exists
+        const existingEmail = await UserDAO.findByEmail(new_email);
+        if (existingEmail) {
+            return res.status(400).json({ error: "Email already in use by another account" });
+        }
+        
+        // Generate email change token
+        const emailChangeToken = tokenService.generateEmailChangeToken({
+            userId: user.id,
+            currentEmail: current_email,
+            newEmail: new_email
+        });
+        
+        // Store token in database
+        await UserDAO.createEmailChangeToken(userId, emailChangeToken);
+        
+        // Send email change verification email to new email
+        await mailService.sendEmailChangeVerificationEmail(new_email, emailChangeToken, userId);
+        
+        res.json({ message: "Email change verification sent to your new email address" });
+    } catch (err) {
+        console.error('Email change error:', err);
+        res.status(500).json({ error: "Failed to process email change request" });
+    }
+}
+
+/**
+ * Verify Email Change Handler
+ * Validates token and updates user's email
+ */
+async function verifyEmailChange(req, res) {
+    try {
+        const { token, userId } = req.query;
+        
+        if (!token || !userId) {
+            return res.status(400).json({ error: "Missing token or userId" });
+        }
+        
+        // Verify token
+        const decoded = tokenService.verifyToken(token, 'email_change');
+        if (!decoded || decoded.userId != userId) {
+            return res.status(400).json({ error: "Invalid or expired email change link" });
+        }
+        
+        // Update email
+        const updated = await UserDAO.updateEmail(userId, decoded.newEmail);
+        if (!updated) {
+            return res.status(500).json({ error: "Failed to update email" });
+        }
+        
+        // Send confirmation email to both old and new addresses
+        await mailService.sendEmailChangeConfirmation(decoded.currentEmail, decoded.newEmail);
+        
+        // Return success with logout flag
+        res.json({ 
+            message: "Email changed successfully. Please log in with your new email.",
+            logout: true
+        });
+    } catch (err) {
+        console.error('Email change verification error:', err);
+        res.status(500).json({ error: "Server error: " + err.message });
     }
 }
 
@@ -213,21 +604,8 @@ async function generateNewApiKey(req, res) {
             return res.status(429).json({ error: cooldown.message });
         }
         
-        const apiKey = generateApiKey();
-
-        const statusField = keyType === 'secondary' ? 'is_active_secondary' : 'is_active_primary';
-        const otherStatusField = keyType === 'secondary' ? 'is_active_primary' : 'is_active_secondary';
-
-        // Generate new key and deactivate the other one
-        await db.query(
-            `UPDATE users 
-             SET ${keyType === 'secondary' ? 'api_key_secondary' : 'api_key_primary'} = ?,
-                 ${statusField} = 1,
-                 ${keyType === 'secondary' ? 'created_at_secondary' : 'created_at_primary'} = NOW(),
-                 ${otherStatusField} = 0
-             WHERE id = ?`,
-            [apiKey, userId]
-        );
+        // Generate new API key
+        const apiKey = await UserDAO.generateNewApiKey(userId, keyType);
         
         // Update the cooldown timestamp
         updateCooldown(userId, keyType);
@@ -241,119 +619,89 @@ async function generateNewApiKey(req, res) {
     }
 }
 
-// Toggle API Key status
-async function toggleApiKey(req, res) {
+// Toggle API Key Status
+async function toggleApiKeyStatus(req, res) {
     try {
-        const userId = req.user.id;
-        const { keyType } = req.body; // 'primary' or 'secondary'
+        // Get userId from either params or the authenticated user
+        const currentUserId = req.user.id;
+        const paramsUserId = req.params.userId;
+        const userId = paramsUserId ? parseInt(paramsUserId) : currentUserId;
         
-        // Get current user data
-        const [user] = await db.query(
-            "SELECT * FROM users WHERE id = ?",
-            [userId]
-        );
-
-        if (user.length === 0) {
-            return res.status(404).json({ error: "User not found" });
+        // Security check: Users can only modify their own API keys
+        if (userId !== currentUserId) {
+            return res.status(403).json({ error: "You can only modify your own API keys" });
         }
-
-        const currentUser = user[0];
-        const keyField = keyType === 'secondary' ? 'api_key_secondary' : 'api_key_primary';
-        const statusField = keyType === 'secondary' ? 'is_active_secondary' : 'is_active_primary';
-        const otherStatusField = keyType === 'secondary' ? 'is_active_primary' : 'is_active_secondary';
-
-        if (!currentUser[keyField]) {
-            return res.status(400).json({ error: `No ${keyType} API key found` });
-        }
-
-        // Toggle the status
-        const newStatus = currentUser[statusField] === 1 ? 0 : 1;
         
-        if (newStatus === 1) {
-            // If activating this key, deactivate the other one
-            await db.query(
-                `UPDATE users 
-                 SET ${statusField} = 1, 
-                     ${otherStatusField} = 0 
-                 WHERE id = ?`,
-                [userId]
-            );
-        } else {
-            // If deactivating, just update this key's status
-            await db.query(
-                `UPDATE users SET ${statusField} = 0 WHERE id = ?`,
-                [userId]
-            );
-        }
-
-        // Fetch updated user data
-        const [updatedUser] = await db.query(
-            `SELECT id, username, first_name, last_name,
-                    api_key_primary, is_active_primary, created_at_primary, last_used_primary,
-                    api_key_secondary, is_active_secondary, created_at_secondary, last_used_secondary
-             FROM users WHERE id = ?`,
-            [userId]
-        );
-
-        res.json({ 
-            message: `${keyType} API key ${newStatus === 1 ? 'activated' : 'deactivated'} successfully`,
-            user: updatedUser[0]
-        });
-    } catch (err) {
-        res.status(500).json({ error: "Failed to toggle API key status" });
-    }
-}
-
-// Delete API Key
-async function deleteApiKey(req, res) {
-    try {
-        const userId = req.user.id;
-        // Check for keyType in both query params and request body
-        const keyType = req.query.keyType || (req.body ? req.body.keyType : null);
+        // Get keyType from body
+        const { keyType, isActive } = req.body;
 
         if (!keyType) {
             return res.status(400).json({ error: "Key type is required" });
         }
 
-        // Verify the user exists
-        const [userCheck] = await db.query("SELECT id FROM users WHERE id = ?", [userId]);
-        if (userCheck.length === 0) {
-            return res.status(404).json({ error: "User not found" });
-        }
-
-        // Set the fields to update based on key type, but keep created_at with a default timestamp
-        const updateFields = keyType === 'primary' ? 
-            'api_key_primary = NULL, is_active_primary = 0, last_used_primary = NULL' :
-            'api_key_secondary = NULL, is_active_secondary = 0, last_used_secondary = NULL';
-
-        // Execute the update
-        const [result] = await db.query(
-            `UPDATE users SET ${updateFields} WHERE id = ?`, 
-            [userId]
-        );
-
-        // Check if the update affected any rows
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ error: "Failed to update API key - user not found" });
-        }
-
-        res.json({ message: `${keyType} API key deleted successfully`, success: true });
-    } catch (err) {
-        res.status(500).json({ error: "Failed to delete API key: " + err.message });
-    }
-}
-
-// Delete Account
-async function deleteAccount(req, res) {
-    try {
-        const userId = req.user.id;
-
-        // Delete user
-        await db.query("DELETE FROM users WHERE id = ?", [userId]);
+        // If isActive is not provided, toggle the current status
+        let newStatus = isActive;
         
-        res.json({ message: "Account deleted successfully" });
+        if (newStatus === undefined) {
+            // Check if the API key exists first
+            const [keyResult] = await UserDAO.executeQuery(
+                `SELECT COUNT(*) as count FROM api_keys WHERE user_id = ? AND key_type = ?`,
+                [userId, keyType]
+            );
+            
+            if (!keyResult || !keyResult.length || keyResult[0].count === 0) {
+                return res.status(404).json({ error: `No ${keyType} API key found for this user` });
+            }
+            
+            // Get current status
+            const [keyStatusResult] = await UserDAO.executeQuery(
+                `SELECT is_active FROM api_keys WHERE user_id = ? AND key_type = ?`,
+                [userId, keyType]
+            );
+            
+            if (!keyStatusResult || keyStatusResult.length === 0) {
+                // If we can't get the status but we know the key exists, assume it's inactive and set to active
+                newStatus = true;
+            } else {
+                // Toggle the status
+                newStatus = !(keyStatusResult[0].is_active === 1 || keyStatusResult[0].is_active === true);
+            }
+        }
+        
+        console.log(`Toggling API key status for user ${userId}, keyType ${keyType} to ${newStatus}`);
+        
+        // If we're activating a key, we need to deactivate the other key type
+        if (newStatus) {
+            const otherKeyType = keyType === 'primary' ? 'secondary' : 'primary';
+            
+            // Deactivate the other key
+            await UserDAO.executeQuery(
+                `UPDATE api_keys SET is_active = false 
+                 WHERE user_id = ? AND key_type = ?`,
+                [userId, otherKeyType]
+            );
+            console.log(`Deactivated ${otherKeyType} key for user ${userId}`);
+        }
+        
+        // Update API key status
+        await UserDAO.executeQuery(
+            `UPDATE api_keys SET is_active = ? 
+             WHERE user_id = ? AND key_type = ?`,
+            [newStatus, userId, keyType]
+        );
+        
+        // Get updated user data
+        const updatedUser = await UserDAO.getUserWithProfileAndKeys(userId);
+        
+        res.json({ 
+            message: `API Key status updated successfully`,
+            keyType,
+            isActive: newStatus,
+            user: updatedUser
+        });
     } catch (err) {
-        res.status(500).json({ error: "Failed to delete account" });
+        console.error("Error toggling API key status:", err);
+        res.status(500).json({ error: "Failed to update API key status" });
     }
 }
 
@@ -361,30 +709,7 @@ async function deleteAccount(req, res) {
 async function getUserApiKeys(req, res) {
     try {
         const userId = req.user.id;
-        const [rows] = await db.query(
-            `SELECT id, 
-                api_key_primary, is_active_primary, created_at_primary, last_used_primary,
-                api_key_secondary, is_active_secondary, created_at_secondary, last_used_secondary
-            FROM users 
-            WHERE id = ?`,
-            [userId]
-        );
-        
-        // Format the response
-        const apiKeys = {
-            primary: rows[0]?.api_key_primary ? {
-                key: rows[0].api_key_primary,
-                is_active: rows[0].is_active_primary === 1,
-                created_at: rows[0].created_at_primary,
-                last_used: rows[0].last_used_primary
-            } : null,
-            secondary: rows[0]?.api_key_secondary ? {
-                key: rows[0].api_key_secondary,
-                is_active: rows[0].is_active_secondary === 1,
-                created_at: rows[0].created_at_secondary,
-                last_used: rows[0].last_used_secondary
-            } : null
-        };
+        const apiKeys = await UserDAO.getUserApiKeys(userId);
         
         res.json(apiKeys);
     } catch (err) {
@@ -395,151 +720,287 @@ async function getUserApiKeys(req, res) {
 // Admin: Get All Users
 async function getAllUsers(req, res) {
     try {
-        const [users] = await db.query(`
-            SELECT id, username, first_name, last_name,
-                api_key_primary, is_active_primary, 
-                DATE_FORMAT(created_at_primary, '%Y-%m-%d %H:%i:%s') AS created_at_primary, 
-                DATE_FORMAT(last_used_primary, '%Y-%m-%d %H:%i:%s') AS last_used_primary,
-                api_key_secondary, is_active_secondary, 
-                DATE_FORMAT(created_at_secondary, '%Y-%m-%d %H:%i:%s') AS created_at_secondary, 
-                DATE_FORMAT(last_used_secondary, '%Y-%m-%d %H:%i:%s') AS last_used_secondary
-            FROM users
-        `);
-
-        // Format the response for each user
-        const formattedUsers = users.map(user => ({
-            id: user.id,
-            username: user.username,
-            first_name: user.first_name,
-            last_name: user.last_name,
-            api_key_primary: user.api_key_primary || 'No API Key',
-            is_active_primary: user.is_active_primary === 1,
-            created_at_primary: user.created_at_primary,
-            last_used_primary: user.last_used_primary,
-            api_key_secondary: user.api_key_secondary || 'No API Key',
-            is_active_secondary: user.is_active_secondary === 1,
-            created_at_secondary: user.created_at_secondary,
-            last_used_secondary: user.last_used_secondary
-        }));
-
-        res.json(formattedUsers);
-    } catch (error) {
+        const users = await UserDAO.getAllUsersWithProfileAndKeys();
+        res.json(users);
+    } catch (err) {
         res.status(500).json({ error: "Failed to fetch users" });
     }
 }
 
-// Admin: Toggle API Key
-async function adminToggleApiKey(req, res) {
+// Admin: Delete User
+async function deleteUser(req, res) {
     try {
         const { userId } = req.params;
-        const { keyType, is_active } = req.body;
         
-        const statusField = keyType === 'secondary' ? 'is_active_secondary' : 'is_active_primary';
-        const otherStatusField = keyType === 'secondary' ? 'is_active_primary' : 'is_active_secondary';
+        // Delete user
+        const success = await UserDAO.delete(userId);
         
-        // If activating one key, deactivate the other
-        if (is_active) {
-            await db.query(
-                `UPDATE users 
-                 SET ${statusField} = 1, 
-                     ${otherStatusField} = 0 
-                 WHERE id = ?`,
-                [userId]
-            );
-        } else {
-            // If deactivating, just update the specified key
-            await db.query(
-                `UPDATE users SET ${statusField} = 0 WHERE id = ?`,
-                [userId]
-            );
-        }
-
-        res.json({ message: "API key status updated successfully" });
-    } catch (error) {
-        res.status(500).json({ error: "Failed to toggle API key status" });
-    }
-}
-
-// Admin: Delete API Key
-async function adminDeleteApiKey(req, res) {
-    try {
-        const { userId } = req.params;
-        // Check for keyType in both query params and request body
-        const keyType = req.query.keyType || (req.body ? req.body.keyType : null);
-        
-        if (!keyType) {
-            return res.status(400).json({ error: "Key type is required" });
-        }
-        
-        // Verify the user exists
-        const [userCheck] = await db.query("SELECT id FROM users WHERE id = ?", [userId]);
-        if (userCheck.length === 0) {
+        if (!success) {
             return res.status(404).json({ error: "User not found" });
         }
         
-        // Set the fields to update based on key type, but keep created_at with a default timestamp
-        const updateFields = keyType === 'primary' ?
-            'api_key_primary = NULL, is_active_primary = 0, last_used_primary = NULL' :
-            'api_key_secondary = NULL, is_active_secondary = 0, last_used_secondary = NULL';
-        
-        // Execute the update
-        const [result] = await db.query(
-            `UPDATE users SET ${updateFields} WHERE id = ?`,
-            [userId]
-        );
-        
-        // Check if the update affected any rows
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ error: "Failed to update API key - user not found" });
-        }
-
-        res.json({ message: "API key deleted successfully", success: true });
-    } catch (error) {
-        res.status(500).json({ error: "Failed to delete API key: " + error.message });
-    }
-}
-
-// Admin: Delete User
-async function adminDeleteUser(req, res) {
-    try {
-        const { userId } = req.params;
-        
-        await db.query("DELETE FROM users WHERE id = ?", [userId]);
-        
         res.json({ message: "User deleted successfully" });
-    } catch (error) {
+    } catch (err) {
         res.status(500).json({ error: "Failed to delete user" });
     }
 }
 
-// Forgot Password
-async function forgotPassword(req, res) {
+// Delete API Key
+async function deleteApiKey(req, res) {
     try {
-        const { username, newPassword } = req.body;
+        const currentUserId = req.user.id;
+        const { userId } = req.params;
+        const { keyType } = req.query; // Get keyType from query parameters
         
-        if (!username || !newPassword) {
-            return res.status(400).json({ error: "Username and new password are required" });
+        // Validate input
+        if (!keyType) {
+            return res.status(400).json({ error: "Key type is required" });
         }
         
-        // Find user by username
-        const [user] = await db.query("SELECT id FROM users WHERE username = ?", [username]);
-        
-        if (user.length === 0) {
-            return res.status(404).json({ error: "User not found" });
+        // Security check: Users can only delete their own API keys
+        if (parseInt(userId) !== currentUserId) {
+            return res.status(403).json({ error: "You can only delete your own API keys" });
         }
         
-        // Hash the new password
-        const hashedPassword = await bcrypt.hash(newPassword, 10);
-        
-        // Update the password
-        await db.query(
-            "UPDATE users SET password_hash = ? WHERE id = ?",
-            [hashedPassword, user[0].id]
+        // Delete the API key by setting it to null
+        await UserDAO.executeQuery(
+            `DELETE FROM api_keys WHERE user_id = ? AND key_type = ?`,
+            [currentUserId, keyType]
         );
         
-        res.json({ message: "Password reset successfully. Please login with your new password." });
+        // Get updated user data
+        const updatedUser = await UserDAO.getUserWithProfileAndKeys(currentUserId);
+        
+        res.json({ 
+            message: `API Key deleted successfully`,
+            success: true,
+            user: updatedUser
+        });
     } catch (err) {
-        res.status(500).json({ error: "Failed to reset password" });
+        console.error("Error deleting API key:", err);
+        res.status(500).json({ error: "Failed to delete API key" });
+    }
+}
+
+/**
+ * Verify Password Change Handler
+ * Validates token and updates user's password
+ */
+async function verifyPasswordChange(req, res) {
+    try {
+        const { token, userId } = req.query;
+        
+        if (!token || !userId) {
+            return res.status(400).json({ error: "Missing token or userId" });
+        }
+        
+        // Verify token
+        const decoded = tokenService.verifyToken(token, 'password_change');
+        if (!decoded || decoded.userId != userId) {
+            return res.status(400).json({ error: "Invalid or expired password change link" });
+        }
+        
+        // Hash new password
+        const hashedPassword = await bcrypt.hash(decoded.newPassword, 10);
+        
+        // Update password
+        const updated = await UserDAO.update(userId, { password_hash: hashedPassword });
+        if (!updated) {
+            return res.status(500).json({ error: "Failed to update password" });
+        }
+        
+        // Send confirmation email
+        const user = await UserDAO.findById(userId);
+        await mailService.sendPasswordChangeConfirmation(user.email);
+        
+        // Return success with logout flag
+        res.json({ 
+            message: "Password changed successfully. Please log in with your new password.",
+            logout: true
+        });
+    } catch (err) {
+        console.error('Password change verification error:', err);
+        res.status(500).json({ error: "Server error: " + err.message });
+    }
+}
+
+/**
+ * Admin login handler
+ * Authenticates admin credentials and returns a token
+ */
+async function adminLogin(req, res) {
+  try {
+    console.log('Admin login attempt received');
+    
+    const { username, password } = req.body;
+    
+    // Log authentication attempt
+    securityLogger.logAuthEvent('admin_login_attempt', {
+      username,
+      ip: req.ip,
+      userAgent: req.headers['user-agent']
+    });
+    
+    // Basic validation
+    if (!username || !password) {
+      console.log('Admin login failed: Missing username or password');
+      securityLogger.logSecurityViolation('invalid_admin_login', {
+        reason: 'Missing username or password',
+        ip: req.ip
+      });
+      return res.status(400).json({
+        error: 'Username and password are required'
+      });
+    }
+    
+    // Get admin credentials from environment variables
+    const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
+    const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+    
+    // Validate admin credentials
+    if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+      console.log('Admin login successful');
+      
+      // Log successful login
+      securityLogger.logAuthEvent('admin_login_success', {
+        username,
+        ip: req.ip
+      });
+      
+      // Generate a secure JWT token for admin
+      const jwt = require('jsonwebtoken');
+      const adminToken = jwt.sign(
+        { id: 'admin', username: 'admin', isAdmin: true },
+        process.env.JWT_SECRET || 'fallback-jwt-secret',
+        { expiresIn: '1h' }
+      );
+      
+      // Set token in HttpOnly cookie
+      res.cookie('auth_token', adminToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        maxAge: 3600000 // 1 hour
+      });
+      
+      // Return success response with token (for backward compatibility)
+      return res.json({
+        success: true,
+        token: adminToken,
+        isAdmin: true
+      });
+    }
+    
+    // Return error for invalid credentials
+    console.log('Admin login failed: Invalid credentials');
+    
+    // Log failed login attempt
+    securityLogger.logSecurityViolation('admin_login_failure', {
+      username,
+      reason: 'Invalid credentials',
+      ip: req.ip
+    });
+    
+    return res.status(401).json({
+      error: 'Invalid admin credentials'
+    });
+  } catch (error) {
+    console.error('[adminLogin] Error:', error);
+    
+    // Log error
+    securityLogger.logSecurityViolation('admin_login_error', {
+      error: error.message,
+      ip: req.ip
+    });
+    
+    res.status(500).json({ error: 'Authentication failed' });
+  }
+}
+
+/**
+ * Logout handler
+ * Clears authentication cookies
+ */
+async function logout(req, res) {
+  try {
+    // Log logout event
+    if (req.user) {
+      securityLogger.logAuthEvent('logout', {
+        userId: req.user.id,
+        username: req.user.username,
+        ip: req.ip
+      });
+    } else {
+      securityLogger.logAuthEvent('logout', {
+        ip: req.ip,
+        note: 'No user in request'
+      });
+    }
+    
+    // Clear the auth token cookie
+    res.clearCookie('auth_token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      path: '/'
+    });
+    
+    res.json({ message: "Logged out successfully" });
+  } catch (error) {
+    console.error('[logout] Error:', error);
+    
+    // Log error
+    securityLogger.logSecurityViolation('logout_error', {
+      error: error.message,
+      ip: req.ip
+    });
+    
+    res.status(500).json({ error: 'Logout failed' });
+  }
+}
+
+/**
+ * Check Session Handler
+ * Validates if the user has a valid session via HttpOnly cookie
+ */
+async function checkSession(req, res) {
+  try {
+    // If the authenticate middleware has passed, the user is authenticated
+    if (req.user) {
+      return res.json({
+        authenticated: true,
+        user: {
+          id: req.user.id,
+          username: req.user.username,
+          isAdmin: !!req.user.isAdmin
+        }
+      });
+    }
+    
+    // If no user object is attached to the request, the session is invalid
+    return res.json({ authenticated: false });
+  } catch (error) {
+    console.error('[checkSession] Error:', error);
+    return res.status(500).json({ error: 'Server error', authenticated: false });
+  }
+}
+
+/**
+ * Check Admin Status Handler
+ * Validates if the current user is an admin
+ */
+async function checkAdminStatus(req, res) {
+  try {
+    // If the user is authenticated and has admin rights
+    if (req.user && req.user.isAdmin) {
+      return res.json({ isAdmin: true });
+    }
+    
+    // If no admin privileges
+    return res.json({ isAdmin: false });
+  } catch (error) {
+    console.error('[checkAdminStatus] Error:', error);
+    return res.status(500).json({ error: 'Server error', isAdmin: false });
     }
 }
 
@@ -550,13 +1011,20 @@ module.exports = {
     updateUserProfile,
     changePassword,
     generateNewApiKey,
-    toggleApiKey,
-    deleteApiKey,
-    deleteAccount,
+    toggleApiKeyStatus,
     getUserApiKeys,
     getAllUsers,
-    adminToggleApiKey,
-    adminDeleteApiKey,
-    adminDeleteUser,
-    forgotPassword
+    deleteUser,
+    deleteApiKey,
+    verifyEmail,
+    resendVerificationEmail,
+    forgotPassword,
+    resetPassword,
+    changeEmail,
+    verifyEmailChange,
+    verifyPasswordChange,
+    adminLogin,
+    logout,
+    checkSession,
+    checkAdminStatus
 }; 

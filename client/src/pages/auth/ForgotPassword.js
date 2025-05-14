@@ -1,71 +1,43 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import axios from "axios";
+import apiClient, { formatErrorMessage } from "../../utils/apiClient";
 import '../../App.css';
-import config from '../../config';
 
 function ForgotPassword() {
-    const [username, setUsername] = useState("");
-    const [newPassword, setNewPassword] = useState("");
-    const [confirmPassword, setConfirmPassword] = useState("");
-    const [passwordErrors, setPasswordErrors] = useState([]);
+    const [email, setEmail] = useState("");
+    const [isLoading, setIsLoading] = useState(false);
     const [message, setMessage] = useState("");
     const [error, setError] = useState("");
     const [success, setSuccess] = useState(false);
     const navigate = useNavigate();
 
-    // Password validation function that checks for minimum requirements
-    const validatePassword = (password) => {
-        const errors = [];
-        if (password.length < 8) {
-            errors.push("Password must be at least 8 characters long");
-        }
-        if (!/\d/.test(password)) {
-            errors.push("Password must contain at least one number");
-        }
-        if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
-            errors.push("Password must contain at least one symbol");
-        }
-        return errors;
-    };
-
-    // Handler for password field with real-time validation
-    const handlePasswordChange = (e) => {
-        const password = e.target.value;
-        setNewPassword(password);
-        setPasswordErrors(validatePassword(password));
-    };
-
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError("");
         setMessage("");
+        setIsLoading(true);
         
-        // Password validation
-        const errors = validatePassword(newPassword);
-        if (errors.length > 0) {
-            setPasswordErrors(errors);
-            return;
-        }
-
-        if (newPassword !== confirmPassword) {
-            setError("Passwords do not match!");
+        if (!email) {
+            setError("Email is required");
+            setIsLoading(false);
             return;
         }
         
         try {
-            const response = await axios.post(
-                `${config.apiBaseUrl}/auth/forgot-password`, 
-                { username, newPassword }
+            // Use apiClient for automatic throttling and error handling
+            const response = await apiClient.post(
+                '/auth/forgot-password', 
+                { email }
             );
             setMessage(response.data.message);
             setSuccess(true);
             // Clear the form
-            setUsername("");
-            setNewPassword("");
-            setConfirmPassword("");
+            setEmail("");
         } catch (error) {
-            setError(error.response?.data?.error || "Failed to reset password");
+            console.error("Password reset request error:", error);
+            setError(formatErrorMessage(error));
+        } finally {
+            setIsLoading(false);
         }
     };
     
@@ -77,9 +49,9 @@ function ForgotPassword() {
         <div className="page-container">
             <div className="form-container">
                 <div className="page-header">
-                    <h2 className="page-title">Reset Password</h2>
+                    <h2 className="page-title">Forgot Password</h2>
                     {!success && (
-                        <p className="page-subtitle">Enter your username and new password</p>
+                        <p className="page-subtitle">Enter your email to receive password reset instructions</p>
                     )}
                 </div>
 
@@ -90,41 +62,17 @@ function ForgotPassword() {
                     <>
                         <form onSubmit={handleSubmit} className="form-group">
                             <input 
-                                type="text" 
-                                placeholder="Username" 
-                                value={username}
-                                onChange={(e) => setUsername(e.target.value)} 
+                                type="email" 
+                                placeholder="Email Address" 
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)} 
                                 required 
+                                disabled={isLoading}
                             />
                             
-                            <div className="password-input-container">
-                                <input 
-                                    type="password" 
-                                    placeholder="New Password" 
-                                    value={newPassword}
-                                    onChange={handlePasswordChange} 
-                                    required 
-                                />
-                                {passwordErrors.length > 0 && (
-                                    <div className="password-requirements">
-                                        {passwordErrors.map((error, index) => (
-                                            <p key={index} className="requirement-item" style={{ color: 'var(--warning-color)', fontSize: '0.9rem', margin: '0.2rem 0' }}>
-                                                ⚠️ {error}
-                                            </p>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                            
-                            <input 
-                                type="password" 
-                                placeholder="Confirm Password" 
-                                value={confirmPassword}
-                                onChange={(e) => setConfirmPassword(e.target.value)} 
-                                required 
-                            />
-                            
-                            <button type="submit">Reset Password</button>
+                            <button type="submit" disabled={isLoading}>
+                                {isLoading ? 'Processing...' : 'Send Reset Instructions'}
+                            </button>
                         </form>
                         <p className="text-center">
                             <Link to="/login" className="text-primary">Back to Login</Link>
@@ -132,12 +80,13 @@ function ForgotPassword() {
                     </>
                 ) : (
                     <div className="success-actions" style={{ textAlign: 'center' }}>
+                        <p>Check your email for password reset instructions.</p>
                         <button 
                             onClick={handleLogin} 
                             className="btn-primary"
                             style={{ margin: '20px auto', display: 'block' }}
                         >
-                            GO TO LOGIN
+                            BACK TO LOGIN
                         </button>
                     </div>
                 )}

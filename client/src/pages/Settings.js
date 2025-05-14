@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
-import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import apiClient, { formatErrorMessage } from '../utils/apiClient';
+import { useNavigate, Link } from "react-router-dom";
 import '../App.css';
 import config from '../config';
+import { getBlogApiUrl } from '../utils/apiUtils';
 
 // Settings component that allows users to manage their account settings,
 // API keys, and security preferences
@@ -12,15 +13,31 @@ function Settings() {
     const [message, setMessage] = useState("");
     const [oldPassword, setOldPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
+    const [email, setEmail] = useState("");
+    const [oldEmail, setOldEmail] = useState("");
+    const [newEmail, setNewEmail] = useState("");
     const [first_name, setFirstName] = useState("");
     const [last_name, setLastName] = useState("");
     const [isEditing, setIsEditing] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [apiKeys, setApiKeys] = useState([]);
+    const [csrfToken, setCsrfToken] = useState("");
+    const [showPasswordChangeModal, setShowPasswordChangeModal] = useState(false);
+    const [showEmailChangeModal, setShowEmailChangeModal] = useState(false);
     
+    // Add state for blog posts
+    const [userPosts, setUserPosts] = useState([]);
+    const [postsLoading, setPostsLoading] = useState(false);
+    const [showDeletePostModal, setShowDeletePostModal] = useState(false);
+    const [postToDelete, setPostToDelete] = useState(null);
+
     // State to control API key visibility
     const [showPrimaryKey, setShowPrimaryKey] = useState(false);
     const [showSecondaryKey, setShowSecondaryKey] = useState(false);
+
+    // Add state for tracking key operations
+    const [primaryKeyLoading, setPrimaryKeyLoading] = useState(false);
+    const [secondaryKeyLoading, setSecondaryKeyLoading] = useState(false);
 
     // Use config for API base URL
     const API_BASE_URL = `${config.apiBaseUrl}/auth`;
@@ -32,13 +49,26 @@ function Settings() {
         return key.substring(0, 4) + '••••••••••••' + key.substring(key.length - 4);
     };
 
+    // Fetch CSRF token
+    const fetchCsrfToken = useCallback(async () => {
+        try {
+            // Get CSRF token from the root endpoint
+            const response = await apiClient.get('');
+            if (response.data && response.data.csrfToken) {
+                setCsrfToken(response.data.csrfToken);
+                // Also store the token in a cookie to match what the server expects
+                document.cookie = `XSRF-TOKEN=${response.data.csrfToken}; path=/; SameSite=Strict`;
+            }
+        } catch (error) {
+            console.error('Error fetching CSRF token:', error);
+        }
+    }, []);
+
     // Fetch user profile data with authentication token
     // Memoized with useCallback to prevent unnecessary re-renders
     const fetchUserData = useCallback(async () => {
         try {
-            const response = await axios.get(`${API_BASE_URL}/profile`, {
-                headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-            });
+            const response = await apiClient.get('/auth/profile');
             
             if (!response.data.id) {
                 setMessage("Error: Incomplete user data received");
@@ -48,6 +78,8 @@ function Settings() {
             setUserDetails(response.data);
             setFirstName(response.data.first_name || "");
             setLastName(response.data.last_name || "");
+            setEmail(response.data.email || "");
+            setOldEmail(response.data.email || "");
             
             // Reset visibility state when loading new data
             setShowPrimaryKey(false);
@@ -55,34 +87,79 @@ function Settings() {
         } catch (error) {
             setMessage("Failed to load profile");
         }
-    }, [API_BASE_URL]);
+    }, []);
 
     // Fetch API keys associated with the user's account
     // Memoized with useCallback to maintain referential equality
     const fetchApiKeys = useCallback(async () => {
         try {
-            const response = await axios.get(`${API_BASE_URL}/api-keys`, {
-                headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-            });
+            const response = await apiClient.get('/auth/api-keys');
             setApiKeys(response.data);
         } catch (error) {
             setMessage("Failed to load API keys");
         }
-    }, [API_BASE_URL, setApiKeys]);
+    }, [setApiKeys]);
 
-    // Load user data and API keys when component mounts
-    // Dependencies properly configured for React hooks/exhaustive-deps rule
-    useEffect(() => {
-        fetchUserData();
-        fetchApiKeys();
-    }, [fetchUserData, fetchApiKeys]);
+    // Fetch user's blog posts
+    const fetchUserPosts = useCallback(async () => {
+        if (!userDetails?.id) return;
+        
+        setPostsLoading(true);
+        try {
+            const token = localStorage.getItem("token");
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            
+            const { url } = getBlogApiUrl('/posts');
+            const response = await apiClient.get(url, {
+                params: { 
+                    userId: userDetails.id,
+                    page: 1,
+                    limit: 50
+                },
+                headers
+            });
+            
+            if (Array.isArray(response.data.posts)) {
+                setUserPosts(response.data.posts);
+            } else {
+                setUserPosts([]);
+            }
+        } catch (error) {
+            console.error('Failed to fetch user posts:', error);
+            setMessage("Failed to load your blog posts");
+        } finally {
+            setPostsLoading(false);
+        }
+    }, [userDetails?.id]);
+
+    // Handle reaction (like/dislike) on blog posts
+    const handleReaction = async (postId, action) => {
+        const token = localStorage.getItem("token");
+        if (!token) {
+            navigate('/login', { state: { from: '/settings' } });
+            return;
+        }
+
+        try {
+            const { url } = getBlogApiUrl(`/posts/${postId}/reaction`);
+            await apiClient.post(
+                url,
+                { action },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            // Refresh posts data to update reaction counts
+            fetchUserPosts();
+        } catch (error) {
+            setMessage("Failed to process reaction");
+        }
+    };
 
     // Handle profile information updates (first name, last name)
     const handleUpdateProfile = async (e) => {
         e.preventDefault();
         try {
-            const response = await axios.post(
-                `${API_BASE_URL}/update-profile`,
+            const response = await apiClient.post(
+                '/auth/profile/update',
                 { first_name, last_name },
                 { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }}
             );
@@ -97,13 +174,11 @@ function Settings() {
     // Handle account deletion with confirmation dialog
     const handleDeleteAccount = async () => {
         try {
-            await axios.delete(
-                `${API_BASE_URL}/delete-account`,
-                { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }}
-            );
+            await apiClient.delete('/auth/account');
             // Clear authentication and redirect to login page
             localStorage.removeItem("token");
-            window.dispatchEvent(new Event('storage'));
+            localStorage.removeItem("userId");
+            localStorage.removeItem("username");
             navigate("/login");
         } catch (error) {
             setMessage(error.response?.data?.error || "Failed to delete account");
@@ -111,57 +186,62 @@ function Settings() {
         }
     };
 
-    // Handle password changes with old and new password validation
+    // Handle password changes with email verification
     const handleChangePassword = async (e) => {
         e.preventDefault();
         try {
-            const response = await axios.post(
-                `${API_BASE_URL}/change-password`, 
-                { oldPassword, newPassword },
-                { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }}
+            // First make sure we have the email from the user profile
+            if (!email && userDetails?.email) {
+                setEmail(userDetails.email);
+            }
+            
+            const response = await apiClient.post(
+                '/auth/password/change', 
+                { 
+                    current_password: oldPassword,
+                    new_password: newPassword,
+                    email: email || userDetails?.email
+                },
+                { 
+                    headers: { 
+                        Authorization: `Bearer ${localStorage.getItem("token")}`
+                    }
+                }
             );
-            setMessage(response.data.message);
+            setShowPasswordChangeModal(true);
+            setMessage(response.data.message || "Password change verification email sent");
             // Clear password fields after successful update
             setOldPassword("");
             setNewPassword("");
         } catch (error) {
+            console.error('Error changing password:', error);
             setMessage(error.response?.data?.error || "Failed to change password");
         }
     };
 
-    // Toggle API key active status (activate/deactivate)
-    // When one key is activated, the other is automatically deactivated
-    const handleToggleApiKey = async (keyType) => {
+    // Handle email change with verification
+    const handleChangeEmail = async (e) => {
+        e.preventDefault();
         try {
-            if (!userDetails?.id) {
-                setMessage("Error: User details not found. Please refresh the page.");
-                return;
-            }
-
-            if (!userDetails?.[`api_key_${keyType}`]) {
-                setMessage(`Error: No ${keyType} API key found. Please generate an API key first.`);
-                return;
-            }
-            
-            const response = await axios.post(
-                `${API_BASE_URL}/toggle-api-key/${userDetails.id}`,
-                { keyType },
-                { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }}
+            const response = await apiClient.post(
+                '/auth/email/change', 
+                { 
+                    current_email: oldEmail,
+                    new_email: newEmail
+                },
+                { 
+                    headers: { 
+                        Authorization: `Bearer ${localStorage.getItem("token")}`
+                    }
+                }
             );
-            
-            if (response.data.user) {
-                // Update user details with the updated API key information
-                setUserDetails(prevState => ({
-                    ...prevState,
-                    ...response.data.user
-                }));
-                setMessage(response.data.message);
-            } else {
-                throw new Error("No user data received from server");
-            }
+            setShowEmailChangeModal(true);
+            setMessage(response.data.message || "Email change verification link sent");
+            // Clear email fields after successful update
+            setNewEmail("");
         } catch (error) {
-            const errorMessage = error.response?.data?.error || error.message || "Failed to toggle API key status";
-            setMessage(`Error: ${errorMessage}`);
+            console.error('Error changing email:', error);
+            setMessage(error.response?.data?.error || "Failed to change email");
         }
     };
 
@@ -169,13 +249,17 @@ function Settings() {
     // Subject to cooldown periods managed by the server
     const handleGenerateApiKey = async (keyType) => {
         try {
-            const response = await axios.post(
-                `${API_BASE_URL}/generate-api-key`,
-                { keyType },
-                { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }}
+            const response = await apiClient.post(
+                '/auth/api-keys/generate',
+                { key_type: keyType },
+                { 
+                    headers: { 
+                        Authorization: `Bearer ${localStorage.getItem("token")}`
+                    }
+                }
             );
             
-            if (response.data.apiKey) {
+            if (response.data.api_key) {
                 setMessage("New API key generated successfully");
                 await fetchUserData(); // Refresh user data to get the new API key
             } else {
@@ -191,6 +275,98 @@ function Settings() {
         }
     };
 
+    // Toggle API key active status (enable/disable API key)
+    const handleToggleApiKey = async (keyType) => {
+        try {
+            if (!userDetails?.id) {
+                setMessage("Error: User details not found. Please refresh the page.");
+                return;
+            }
+
+            if (!userDetails?.[`api_key_${keyType}`]) {
+                setMessage(`Error: No ${keyType} API key found. Please generate an API key first.`);
+                return;
+            }
+            
+            // Set the loading state for the appropriate key
+            if (keyType === 'primary') {
+                setPrimaryKeyLoading(true);
+            } else {
+                setSecondaryKeyLoading(true);
+            }
+            
+            // Set optimistic UI update - assume toggle is successful
+            const currentStatus = userDetails?.[`is_active_${keyType}`];
+            const newStatus = !currentStatus;
+            
+            // Update UI optimistically
+            setUserDetails(prev => ({
+                ...prev,
+                [`is_active_${keyType}`]: newStatus
+            }));
+            
+            
+            try {
+                const toggleResponse = await apiClient.post(
+                `/auth/toggle-api-key/${userDetails.id}`,
+                    { 
+                        keyType: keyType, 
+                        isActive: Boolean(newStatus) // Ensure it's a proper boolean
+                    },
+                { 
+                    headers: { 
+                        Authorization: `Bearer ${localStorage.getItem("token")}`
+                    }
+                }
+            );
+                
+                if (toggleResponse.data.user) {
+                    // Update user details with the updated API key information from server
+                setUserDetails(prevState => ({
+                    ...prevState,
+                        ...toggleResponse.data.user
+                }));
+                    setMessage(`${keyType.charAt(0).toUpperCase() + keyType.slice(1)} API key ${newStatus ? 'activated' : 'deactivated'} successfully`);
+                } else if (toggleResponse.data.message) {
+                    setMessage(toggleResponse.data.message);
+                    // Refresh the user data to get the latest API key status
+                    await fetchUserData();
+                }
+            } catch (error) {
+                console.error('Error toggling API key:', error);
+                // Revert optimistic update on error
+                setUserDetails(prev => ({
+                    ...prev,
+                    [`is_active_${keyType}`]: currentStatus
+                }));
+                
+                const errorMessage = error.response?.data?.error || error.message || "Failed to toggle API key status";
+                setMessage(`Error: ${errorMessage}`);
+                
+                // Always refresh user data after an error to ensure UI is in sync
+                await fetchUserData();
+            } finally {
+                // Reset loading state
+                if (keyType === 'primary') {
+                    setPrimaryKeyLoading(false);
+            } else {
+                    setSecondaryKeyLoading(false);
+                }
+            }
+        } catch (error) {
+            console.error('Unexpected error in handleToggleApiKey:', error);
+            setMessage(`Unexpected error: ${error.message}`);
+            await fetchUserData();
+            
+            // Reset loading state in case of unexpected error
+            if (keyType === 'primary') {
+                setPrimaryKeyLoading(false);
+            } else {
+                setSecondaryKeyLoading(false);
+            }
+        }
+    };
+
     // Delete an API key permanently
     const handleDeleteApiKey = async (keyType) => {
         try {
@@ -199,22 +375,25 @@ function Settings() {
                 return;
             }
             
-            
-            // First try with query parameters
-            const response = await axios({
-                method: 'DELETE',
-                url: `${API_BASE_URL}/delete-api-key/${userDetails.id}`,
+            // Use axios delete with query parameters
+            const deleteResponse = await apiClient.delete(
+                `/auth/delete-api-key/${userDetails.id}`,
+                { 
                 headers: { 
                     Authorization: `Bearer ${localStorage.getItem("token")}`,
                     'Content-Type': 'application/json'
                 },
-                params: { keyType }
-            });
-            
+                data: { key_type: keyType }
+                }
+            );
 
-            if (response.data.success) {
+            if (deleteResponse.data.success) {
                 setMessage(`${keyType} API key deleted successfully`);
-                // Update local state before fetching new data
+                // Update local state if the user data was returned
+                if (deleteResponse.data.user) {
+                    setUserDetails(deleteResponse.data.user);
+                } else {
+                    // Otherwise update just the specific keys
                 setUserDetails(prev => ({
                     ...prev,
                     [`api_key_${keyType}`]: null,
@@ -223,10 +402,13 @@ function Settings() {
                     [`last_used_${keyType}`]: null
                 }));
                 await fetchUserData(); // Refresh user data
+                }
             } else {
-                throw new Error("API responded but deletion may have failed");
+                setMessage(deleteResponse.data.message || "API key deletion successful");
+                await fetchUserData(); // Refresh user data
             }
         } catch (error) {
+            console.error('Error deleting API key:', error);
             setMessage(error.response?.data?.error || "Failed to delete API key");
             // Even if there's an error response, the key might have been deleted
             // so refresh the data anyway
@@ -244,6 +426,39 @@ function Settings() {
         setShowSecondaryKey(!showSecondaryKey);
     };
 
+    // Handle post deletion
+    const handleDeletePost = async () => {
+        if (!postToDelete) return;
+        
+        try {
+            const { url } = getBlogApiUrl(`/posts/${postToDelete.id}`);
+            await apiClient.delete(
+                url,
+                { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }}
+            );
+            
+            // Remove deleted post from state
+            setUserPosts(prevPosts => prevPosts.filter(post => post.id !== postToDelete.id));
+            setMessage("Blog post deleted successfully");
+        } catch (error) {
+            setMessage(error.response?.data?.error || "Failed to delete blog post");
+        } finally {
+            setShowDeletePostModal(false);
+            setPostToDelete(null);
+        }
+    };
+    
+    // Edit a post
+    const handleEditPost = (postId) => {
+        navigate(`/blog/edit/${postId}`);
+    };
+    
+    // Confirm post deletion
+    const confirmDeletePost = (post) => {
+        setPostToDelete(post);
+        setShowDeletePostModal(true);
+    };
+
     // Helper function to determine message styling based on content
     // Returns appropriate CSS class for success or error messages
     const getMessageClass = (msg) => {
@@ -252,6 +467,21 @@ function Settings() {
         }
         return 'success-message';
     };
+
+    // Load user data and API keys when component mounts
+    // Dependencies properly configured for React hooks/exhaustive-deps rule
+    useEffect(() => {
+        fetchCsrfToken();
+        fetchUserData();
+        fetchApiKeys();
+    }, [fetchUserData, fetchApiKeys, fetchCsrfToken]);
+    
+    // Fetch posts when user details are loaded
+    useEffect(() => {
+        if (userDetails?.id) {
+            fetchUserPosts();
+        }
+    }, [userDetails?.id, fetchUserPosts]);
 
     return (
         <div className="page-container">
@@ -300,7 +530,7 @@ function Settings() {
                                             }}
                                         >
                                             Cancel
-                    </button>
+                                        </button>
                                     </div>
                                 </form>
                             ) : (
@@ -311,30 +541,61 @@ function Settings() {
                                     <div className="info-label-pair">
                                         <strong>Last Name</strong><span>{userDetails.last_name || "Not set"}</span>
                                     </div>
+                                    <div className="info-label-pair">
+                                        <strong>Email</strong><span>{userDetails.email || "Not set"}</span>
+                                    </div>
                                     <button onClick={() => setIsEditing(true)}>Edit Profile</button>
                                 </div>
                             )}
                         </div>
 
                         <div className="password-section">
-                    <h3>Change Password</h3>
+                            <h3>Change Password</h3>
                             <form onSubmit={handleChangePassword} className="form-group">
-                        <input
-                            type="password"
-                            placeholder="Old Password"
-                            value={oldPassword}
-                            onChange={(e) => setOldPassword(e.target.value)}
-                            required
-                        />
-                        <input
-                            type="password"
-                            placeholder="New Password"
-                            value={newPassword}
-                            onChange={(e) => setNewPassword(e.target.value)}
-                            required
-                        />
-                        <button type="submit">Change Password</button>
-                    </form>
+                                <input
+                                    type="email"
+                                    placeholder="Confirm Your Email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    required
+                                />
+                                <input
+                                    type="password"
+                                    placeholder="Current Password"
+                                    value={oldPassword}
+                                    onChange={(e) => setOldPassword(e.target.value)}
+                                    required
+                                />
+                                <input
+                                    type="password"
+                                    placeholder="New Password"
+                                    value={newPassword}
+                                    onChange={(e) => setNewPassword(e.target.value)}
+                                    required
+                                />
+                                <button type="submit">Request Password Change</button>
+                            </form>
+                        </div>
+
+                        <div className="email-section">
+                            <h3>Change Email</h3>
+                            <form onSubmit={handleChangeEmail} className="form-group">
+                                <input
+                                    type="email"
+                                    placeholder="Current Email"
+                                    value={oldEmail}
+                                    onChange={(e) => setOldEmail(e.target.value)}
+                                    required
+                                />
+                                <input
+                                    type="email"
+                                    placeholder="New Email"
+                                    value={newEmail}
+                                    onChange={(e) => setNewEmail(e.target.value)}
+                                    required
+                                />
+                                <button type="submit">Request Email Change</button>
+                            </form>
                         </div>
                     </div>
 
@@ -388,8 +649,12 @@ function Settings() {
                                         <button 
                                             className={userDetails.is_active_primary ? 'btn-warning' : 'btn-success'}
                                             onClick={() => handleToggleApiKey('primary')}
+                                            disabled={primaryKeyLoading}
                                         >
-                                            {userDetails.is_active_primary ? 'Deactivate' : 'Activate'}
+                                            {primaryKeyLoading 
+                                                ? 'Processing...' 
+                                                : userDetails.is_active_primary ? 'Deactivate' : 'Activate'
+                                            }
                                         </button>
                                         <button 
                                             className="btn-danger"
@@ -448,8 +713,12 @@ function Settings() {
                                         <button 
                                             className={userDetails.is_active_secondary ? 'btn-warning' : 'btn-success'}
                                             onClick={() => handleToggleApiKey('secondary')}
+                                            disabled={secondaryKeyLoading}
                                         >
-                                            {userDetails.is_active_secondary ? 'Deactivate' : 'Activate'}
+                                            {secondaryKeyLoading 
+                                                ? 'Processing...' 
+                                                : userDetails.is_active_secondary ? 'Deactivate' : 'Activate'
+                                            }
                                         </button>
                                         <button 
                                             className="btn-danger"
@@ -461,6 +730,88 @@ function Settings() {
                                 </div>
                             )}
                         </div>
+                    </div>
+
+                    {/* User's Blog Posts Block - NEW */}
+                    <div className="settings-block blog-posts-block">
+                        <h3>Your Travel Stories</h3>
+                        
+                        {postsLoading ? (
+                            <div className="loading-spinner">Loading your posts...</div>
+                        ) : userPosts.length > 0 ? (
+                            <div className="user-posts-grid">
+                                {userPosts.map(post => (
+                                    <div key={post.id} className="user-post-card">
+                                        <div className="post-header">
+                                            <h4>{post.title}</h4>
+                                            <span className="post-date">
+                                                {new Date(post.created_at).toLocaleDateString()}
+                                            </span>
+                                        </div>
+                                        <div className="post-meta">
+                                            <span className="post-country">📍 {post.country_name}</span>
+                                        </div>
+                                        <p className="post-excerpt">
+                                            {post.content.substring(0, 100)}
+                                            {post.content.length > 100 ? '...' : ''}
+                                        </p>
+                                        <div className="post-stats">
+                                            <span className="stat likes">
+                                                <button 
+                                                    className={`reaction-btn ${post.userReaction === 'like' ? 'active' : ''}`}
+                                                    onClick={() => handleReaction(post.id, post.userReaction === 'like' ? 'remove' : 'like')}
+                                                >
+                                                    👍 {post.likes_count || 0}
+                                                </button>
+                                            </span>
+                                            <span className="stat dislikes">
+                                                <button 
+                                                    className={`reaction-btn ${post.userReaction === 'dislike' ? 'active' : ''}`}
+                                                    onClick={() => handleReaction(post.id, post.userReaction === 'dislike' ? 'remove' : 'dislike')}
+                                                >
+                                                    👎 {post.dislikes_count || 0}
+                                                </button>
+                                            </span>
+                                            <span className="stat comments">
+                                                <button
+                                                    className="reaction-btn"
+                                                    onClick={() => navigate(`/blog/post/${post.id}`)}
+                                                >
+                                                    💬 {post.comments_count || 0}
+                                                </button>
+                                            </span>
+                                        </div>
+                                        <Link 
+                                            to={`/blog/post/${post.id}`} 
+                                            className="post-view-btn"
+                                        >
+                                            Read Full Story
+                                        </Link>
+                                        <div className="post-actions-row">
+                                            <button 
+                                                className="post-edit-btn"
+                                                onClick={() => handleEditPost(post.id)}
+                                            >
+                                                Edit
+                                            </button>
+                                            <button 
+                                                className="post-delete-btn"
+                                                onClick={() => confirmDeletePost(post)}
+                                            >
+                                                Delete
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="no-posts-message">
+                                <p>You haven't shared any travel stories yet.</p>
+                                <Link to="/blog/create" className="btn-primary">
+                                    Share a Travel Story
+                                </Link>
+                            </div>
+                        )}
                     </div>
 
                     {/* Account Deletion Block */}
@@ -494,6 +845,81 @@ function Settings() {
                                 onClick={() => setShowDeleteModal(false)}
                             >
                                 Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Add Delete Post Modal */}
+            {showDeletePostModal && postToDelete && (
+                <div className="modal-overlay">
+                    <div className="modal">
+                        <h3>Delete Travel Story</h3>
+                        <p>Are you sure you want to delete "{postToDelete.title}"? This action cannot be undone.</p>
+                        <div className="controls">
+                            <button 
+                                className="btn-danger"
+                                onClick={handleDeletePost}
+                            >
+                                Yes, Delete Story
+                            </button>
+                            <button 
+                                className="btn-secondary"
+                                onClick={() => {
+                                    setShowDeletePostModal(false);
+                                    setPostToDelete(null);
+                                }}
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Password Change Modal */}
+            {showPasswordChangeModal && (
+                <div className="modal-overlay">
+                    <div className="modal">
+                        <h3 className="modal-title">Password Change Requested</h3>
+                        <p className="success-text">
+                            A verification link has been sent to your email.
+                        </p>
+                        <p className="text-secondary">
+                            Please check your inbox and click the link to confirm your password change.
+                            For security reasons, the link will expire after 1 hour.
+                        </p>
+                        <div className="controls">
+                            <button 
+                                className="btn-primary"
+                                onClick={() => setShowPasswordChangeModal(false)}
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Email Change Modal */}
+            {showEmailChangeModal && (
+                <div className="modal-overlay">
+                    <div className="modal">
+                        <h3 className="modal-title">Email Change Requested</h3>
+                        <p className="success-text">
+                            A verification link has been sent to your new email address.
+                        </p>
+                        <p className="text-secondary">
+                            Please check the inbox of your new email and click the link to confirm the change.
+                            For security reasons, the link will expire after 1 hour.
+                        </p>
+                        <div className="controls">
+                            <button 
+                                className="btn-primary"
+                                onClick={() => setShowEmailChangeModal(false)}
+                            >
+                                Close
                             </button>
                         </div>
                     </div>

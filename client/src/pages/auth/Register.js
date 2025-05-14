@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { registerUser } from "../services/authApi"; // Import the API function
 import { useNavigate } from "react-router-dom";
 import '../../App.css';
 import { Link } from "react-router-dom";
+import apiClient, { formatErrorMessage } from '../../utils/apiClient';
 
 // Component for user registration with form validation and modal feedback
 function Register() {
@@ -10,13 +10,15 @@ function Register() {
     const [username, setUsername] = useState("");
     const [firstName, setFirstName] = useState("");
     const [lastName, setLastName] = useState("");
+    const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     // State for UI control and feedback
     const [showModal, setShowModal] = useState(false);
-    const [setMessage] = useState("");
+    const [message, setMessage] = useState("");
     const [error, setError] = useState("");
     const [passwordErrors, setPasswordErrors] = useState([]);
+    const [isLoading, setIsLoading] = useState(false);
     const navigate = useNavigate();
 
     // Password validation function that checks for minimum requirements
@@ -45,32 +47,47 @@ function Register() {
     const handleRegister = async (e) => {
         e.preventDefault();
         setError("");
+        setIsLoading(true);
         
         // Password validation
         const errors = validatePassword(password);
         if (errors.length > 0) {
             setPasswordErrors(errors);
+            setIsLoading(false);
             return;
         }
 
         if (password !== confirmPassword) {
             setError("Passwords do not match!");
+            setIsLoading(false);
             return;
         }
 
         const registrationData = {
             username,
             password,
+            email,
             first_name: firstName,
             last_name: lastName
         };
 
         try {
-            await registerUser(registrationData);
-            setMessage("Registration successful!");
+            // Use apiClient instead of axios directly
+            const response = await apiClient.post('/auth/register', registrationData);
+            
+            // Don't store token in localStorage since we want user to verify email first
+            // Just set the message and show modal
+            
+            setMessage(response.data.message || "Registration successful! Please check your email to verify your account.");
             setShowModal(true);
         } catch (error) {
-            setError(error.response?.data?.error || "Registration failed");
+            // Log the full error for debugging
+            console.error('Registration error:', error);
+            
+            // Use formatErrorMessage for consistent error display
+            setError(formatErrorMessage(error));
+        } finally {
+            setIsLoading(false);
         }        
     };
 
@@ -98,6 +115,7 @@ function Register() {
                         value={username}
                         onChange={(e) => setUsername(e.target.value)} 
                         required 
+                        disabled={isLoading}
                     />
                     <input 
                         type="text" 
@@ -105,6 +123,7 @@ function Register() {
                         value={firstName}
                         onChange={(e) => setFirstName(e.target.value)} 
                         required 
+                        disabled={isLoading}
                     />
                     <input 
                         type="text" 
@@ -112,6 +131,15 @@ function Register() {
                         value={lastName}
                         onChange={(e) => setLastName(e.target.value)} 
                         required 
+                        disabled={isLoading}
+                    />
+                    <input 
+                        type="email" 
+                        placeholder="Email" 
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)} 
+                        required
+                        disabled={isLoading}
                     />
                     <div className="password-input-container">
                         <input 
@@ -120,6 +148,7 @@ function Register() {
                             value={password}
                             onChange={handlePasswordChange} 
                             required 
+                            disabled={isLoading}
                         />
                         {/* Password requirement warnings */}
                         {passwordErrors.length > 0 && (
@@ -138,8 +167,11 @@ function Register() {
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)} 
                         required 
+                        disabled={isLoading}
                     />
-                    <button type="submit">Register</button>
+                    <button type="submit" disabled={isLoading}>
+                        {isLoading ? 'Registering...' : 'Register'}
+                    </button>
                 </form>
 
                 {/* Login link for existing users */}
@@ -151,20 +183,21 @@ function Register() {
             {/* Success modal that appears after successful registration */}
             {showModal && (
                 <div className="modal-overlay">
-                    <div className="modal text-center">
-                        <h3 className="modal-title">Registration Successful</h3>
-                        <p className="success-text">
-                            Your account has been created successfully! Your primary API key has been automatically generated.
-                        </p>
+                    <div className="modal">
+                        <h3 className="modal-title">Registration Successful!</h3>
+                        <div className="success-text">
+                            {message}
+                        </div>
                         <p className="text-secondary">
-                            Please log in to access your dashboard and view your API key in the Settings page.
+                            We've sent a verification email to <strong>{email}</strong>. 
+                            Please check your inbox (and spam folder) to verify your account.
                         </p>
                         <div className="controls">
                             <button 
                                 onClick={handleLoginRedirect}
                                 className="btn-primary"
                             >
-                                Go to Login
+                                Continue to Login
                             </button>
                         </div>
                     </div>

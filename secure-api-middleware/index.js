@@ -1,100 +1,145 @@
 /**
  * Main Application Entry Point
- * Initializes and configures the Secure Country API service
+ * Sets up Express server with middleware, routes, and error handling
  */
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const cookieParser = require('cookie-parser');
+const rateLimit = require('express-rate-limit');
+const { csrfGenerator, csrfProtection } = require('./middleware/csrfProtection');
+const { sanitizeRequestBody } = require('./utils/sanitizer');
+
+// Import route modules
 const authRoutes = require('./routes/authRoutes');
+const blogRoutes = require('./routes/blogRoutes');
 const countryRoutes = require('./routes/countryRoutes');
-require('dotenv').config();  // Load environment variables from .env file
-const pool = require('./config/db');
+const adminRoutes = require('./routes/adminRoutes');
 
-// Initialize Express application
+// Import User Model to initialize verification schema
+const UserDAO = require('./models/UserDAO');
+// UserDAO is already an instance, no need to create a new one
+
+// Initialize Express app
 const app = express();
+const PORT = process.env.PORT || 5000;
 
-// Get allowed origins from environment or use defaults with Netlify domain
-const allowedOrigins = process.env.ALLOWED_ORIGINS 
-  ? process.env.ALLOWED_ORIGINS.split(',') 
-  : ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:8080', 'https://illustrious-nougat-89c023.netlify.app'];
-
-// More flexible CORS configuration
-app.use(cors({
-  origin: function(origin, callback) {
-    // Allow requests with no origin (like mobile apps, curl, postman)
-    if (!origin) return callback(null, true);
-    
-    if (process.env.NODE_ENV === 'development') {
-      // In development, allow all origins
-      return callback(null, true);
+// Security middleware
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      imgSrc: ["'self'", "data:", "https://flagcdn.com", "https://restcountries.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      connectSrc: ["'self'", process.env.NODE_ENV === 'production' 
+        ? "https://country-explorer-w1888516.netlify.app" 
+        : "http://localhost:3000"],
+      frameSrc: ["'none'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      frameAncestors: ["'none'"],
+      upgradeInsecureRequests: [],
+      manifestSrc: ["'self'"],
+      workerSrc: ["'self'", "blob:"]
     }
-    
-    if (allowedOrigins.indexOf(origin) === -1) {
-      // Origin not in whitelist, but temporarily allowing all origins
-      return callback(null, true);
-    }
-    
-    return callback(null, true);
   },
-  credentials: true
+  // Enable strict transport security
+  hsts: {
+    maxAge: 15552000, // 180 days
+    includeSubDomains: true,
+    preload: true
+  }
 }));
 
+// CORS configuration - Allow requests from any origin during development
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://country-explorer-w1888516.netlify.app'] 
+    : ['http://localhost:3000'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-CSRF-Token', 'X-XSRF-Token'],
+  exposedHeaders: ['Set-Cookie', 'Date', 'ETag']
+}));
+
+// Rate limiting
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' }
+});
+
 // Apply middleware
-app.use(express.json());  // Parse JSON request bodies
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser(process.env.COOKIE_SECRET || 'cookie-secret'));
+app.use(apiLimiter);
 
-// Register route modules
-app.use('/auth', authRoutes);  // Authentication routes mounted at /auth
-app.use('/api/countries', countryRoutes);  // Country data routes mounted at /api/countries
+// Apply sanitization middleware to all routes
+app.use(sanitizeRequestBody);
 
-// Basic root route for service health check
+// Log cookies for debugging
+app.use((req, res, next) => {
+  console.log('Cookies received:', req.cookies ? Object.keys(req.cookies) : 'No cookies');
+  next();
+});
+
+// Generate CSRF token for all routes
+app.use(csrfGenerator);
+
+// Root route - provide CSRF token
 app.get('/', (req, res) => {
-    res.send('Secure API Middleware is running...');
-});
-
-// Update your health endpoint with more details
-app.get('/health', async (req, res) => {
-  try {
-    // Check database connection
-    const [result] = await pool.query('SELECT 1 as test');
-    
-    // List tables
-    const [tables] = await pool.query('SHOW TABLES');
-    
-    // Get database info
-    const [dbInfo] = await pool.query('SELECT DATABASE() as db');
-    
-    res.json({
-      status: 'ok',
-      database: {
-        connected: true,
-        name: dbInfo[0].db,
-        tables: tables.map(row => Object.values(row)[0]),
-      },
-      environment: {
-        nodeEnv: process.env.NODE_ENV,
-        hasDbUrl: !!process.env.DATABASE_URL,
-        allowedOrigins: process.env.ALLOWED_ORIGINS,
-        port: process.env.PORT
-      },
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    res.status(500).json({
-      status: 'error',
-      message: error.message,
-      stack: process.env.NODE_ENV === 'production' ? undefined : error.stack
-    });
-  }
-});
-
-// Add proper error handling middleware
-app.use((err, req, res, next) => {
-  res.status(500).json({ error: 'Something went wrong!' });
-});
-
-// Start the server with a small delay to allow database initialization
-const PORT = process.env.PORT || 5000;
-setTimeout(() => {
-  app.listen(PORT, () => {
-    // Server started successfully
+  res.status(200).json({
+    message: 'API is running',
+    version: '1.0.0',
+    documentation: '/docs',
+    csrfToken: req.csrfToken // Provide CSRF token for client-side use
   });
-}, 5000); // 5 second delay to give database initialization time to complete 
+});
+
+// Mount routes
+app.use('/auth', authRoutes);
+app.use('/blog', blogRoutes);
+app.use('/countries', countryRoutes);
+app.use('/admin', adminRoutes);
+    
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Initialize database
+(async () => {
+  try {
+    // Initialize email verification fields in the database
+    await UserDAO.updateSchema();
+  } catch (error) {
+    console.error('Error initializing email verification schema:', error);
+  }
+})();
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({
+    error: 'Internal server error',
+    message: process.env.NODE_ENV === 'production' ? 'An unexpected error occurred' : err.message
+  });
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ error: 'Not found', message: 'The requested resource does not exist' });
+});
+
+// Start server
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+}); 

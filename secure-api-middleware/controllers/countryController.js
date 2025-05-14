@@ -1,166 +1,186 @@
 /**
- * Country Data Controller Module
- * Handles all country data retrieval and processing operations, including:
- * - Fetching all countries from external API
- * - Searching for specific countries
- * - Processing and formatting country data for consistent response
+ * Country Controller Module
+ * Handles country data retrieval from REST Countries API
  */
+const axios = require('axios');
 
-const axios = require('axios'); // HTTP client for making requests to external API
+// REST Countries API base URL
+const REST_COUNTRIES_API = 'https://restcountries.com/v3.1';
 
 /**
- * processCountryData
- * Transforms raw country data from external API into a consistent, simplified format
- * 
- * @param {Object} country - Raw country data from external API
- * @returns {Object|null} - Processed country data or null if processing fails
- */
-const processCountryData = (country) => {
-    try {
-        // Extract and format currency information
-        let currency = null;
-        if (country.currencies) {
-            // Get the first currency code (some countries have multiple currencies)
-            const currencyCode = Object.keys(country.currencies)[0];
-            const currencyInfo = country.currencies[currencyCode];
-            
-            currency = {
-                code: currencyCode,
-                name: currencyInfo.name,
-                symbol: currencyInfo.symbol || '' // Default to empty string if no symbol
-            };
-        }
-
-        // Return a consistent data structure for all countries
-        // This simplifies the data for the frontend and ensures consistency
-        return {
-            name: country.name.common,
-            capital: country.capital?.[0] || 'N/A', // Optional chaining with fallback
-            currency: currency,
-            languages: country.languages ? Object.values(country.languages) : [],
-            flag: country.flags.png
-        };
-    } catch (error) {
-        // Return null for invalid countries
-        return null;
-    }
-};
-
-/**
- * fetchCountriesWithRetry
- * Fetches country data from external API with retry mechanism for resilience
- * 
- * @param {number} retries - Maximum number of retry attempts
- * @returns {Promise<Array>} - Array of country data from external API
- */
-const fetchCountriesWithRetry = async (retries = 3) => {
-    // Configure axios with longer timeout and keep-alive
-    const axiosInstance = axios.create({
-        timeout: 15000, // Increased timeout to 15 seconds
-        headers: {
-            'Accept': 'application/json',
-            'User-Agent': 'CountryAPI/1.0',
-            'Connection': 'keep-alive'
-        }
-    });
-
-    for (let i = 0; i < retries; i++) {
-        try {
-            // Try multiple alternative URLs in case one is blocked
-            let response;
-            try {
-                // Primary URL
-                response = await axiosInstance.get('https://restcountries.com/v3.1/all');
-            } catch (primaryError) {
-                // Alternative URL (sometimes helps bypass network restrictions)
-                response = await axiosInstance.get('https://restcountries.com/v3.1/all?fields=name,capital,currencies,languages,flags');
-            }
-            return response.data;
-        } catch (error) {
-            // If we've reached the maximum retries, throw the error
-            if (i === retries - 1) throw error;
-            
-            // Exponential backoff: wait longer between each retry
-            // 1st retry: 1 second, 2nd retry: 2 seconds, 3rd retry: 4 seconds
-            await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, i)));
-        }
-    }
-};
-
-/**
- * getAllCountries
- * Handler for fetching all countries with error handling
- * 
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
+ * Get all countries
+ * Fetches and formats country data from the REST Countries API
  */
 async function getAllCountries(req, res) {
     try {
-        // Fetch countries with retry mechanism for reliability
-        const countriesData = await fetchCountriesWithRetry();
-        
-        // Process and filter the data to ensure consistent format
-        // This maps each country through the processor and filters out any null results
-        const processedData = countriesData
-            .map(processCountryData)
-            .filter(country => country !== null);
-
-        // Verify we have valid data to return
-        if (processedData.length === 0) {
-            throw new Error('No valid country data received');
-        }
-        
-        // Return processed data as JSON
-        res.json(processedData);
+    // Fetch data from REST Countries API
+    const response = await axios.get(`${REST_COUNTRIES_API}/all`);
+    
+    // Transform the data to match our expected format
+    const formattedData = response.data.map(country => ({
+      name: country.name.common,
+      flag: country.flags.png,
+      capital: country.capital ? country.capital[0] : 'N/A',
+      currency: country.currencies ? {
+        name: Object.values(country.currencies)[0].name,
+        code: Object.keys(country.currencies)[0],
+        symbol: Object.values(country.currencies)[0].symbol
+      } : null,
+      languages: country.languages ? Object.values(country.languages) : []
+    }));
+    
+    // Sort data by country name
+    const sortedData = formattedData.sort((a, b) => a.name.localeCompare(b.name));
+    
+    res.json(sortedData);
     } catch (error) {
-        // Detailed user-friendly error message
-        res.status(500).json({ 
-            error: 'Failed to fetch countries',
-            message: 'The external API is currently unavailable. Please try again later.'
-        });
+    console.error('Error fetching countries:', error);
+    res.status(500).json({ error: 'Failed to fetch country data' });
     }
 }
 
 /**
- * searchCountries
- * Handler for searching countries by name
- * 
- * @param {Object} req - Express request object with search query parameter
- * @param {Object} res - Express response object
+ * Search countries
+ * Searches for countries by name, currency, or language
  */
 async function searchCountries(req, res) {
     try {
-        // Extract search query from request parameters
-        const { query } = req.params;
-        
-        // Get all countries and filter them locally instead of making another API call
-        // This is more reliable when the external API might have connection issues
-        const allCountries = await fetchCountriesWithRetry();
-        const processedData = allCountries
-            .map(processCountryData)
-            .filter(country => country !== null)
-            .filter(country => 
-                country.name.toLowerCase().includes(query.toLowerCase())
-            );
-        
-        // Return filtered data as JSON
-        res.json(processedData);
-    } catch (error) {
-        // Special handling for "not found" responses
-        if (error.response?.status === 404) {
-            res.json([]); // Return empty array for no results (better UX than an error)
-        } else {
-            // General error handling
-            res.status(500).json({ 
-                error: 'Failed to search countries',
-                message: 'The external API is currently unavailable. Please try again later.'
-            });
-        }
+    const { query, type = 'name' } = req.query;
+    
+    if (!query) {
+      return res.status(400).json({ error: 'Search query is required' });
     }
+    
+    // Fetch all countries first
+    const response = await axios.get(`${REST_COUNTRIES_API}/all`);
+    
+    // Transform the data to match our expected format
+    const formattedData = response.data.map(country => ({
+      name: country.name.common,
+      flag: country.flags.png,
+      capital: country.capital ? country.capital[0] : 'N/A',
+      currency: country.currencies ? {
+        name: Object.values(country.currencies)[0].name,
+        code: Object.keys(country.currencies)[0],
+        symbol: Object.values(country.currencies)[0].symbol
+      } : null,
+      languages: country.languages ? Object.values(country.languages) : []
+    }));
+    
+    // Filter based on search type
+    let results;
+    const searchQuery = query.toLowerCase();
+    
+    switch (type) {
+      case 'currency':
+        results = formattedData.filter(country => {
+          if (!country.currency) return false;
+          const currencyName = country.currency.name.toLowerCase();
+          const currencyCode = country.currency.code.toLowerCase();
+          const currencySymbol = country.currency.symbol ? country.currency.symbol.toLowerCase() : '';
+          return currencyName.includes(searchQuery) || 
+                 currencyCode.includes(searchQuery) || 
+                 currencySymbol.includes(searchQuery);
+        });
+        break;
+        
+      case 'language':
+        results = formattedData.filter(country => 
+          country.languages.some(lang => 
+            lang.toLowerCase().includes(searchQuery)
+          )
+        );
+        break;
+        
+      default: // name search
+        results = formattedData.filter(country => 
+          country.name.toLowerCase().includes(searchQuery)
+        );
+        break;
+    }
+    
+    res.json(results);
+  } catch (error) {
+    console.error('Error searching countries:', error);
+    res.status(500).json({ error: 'Failed to search countries' });
+  }
 }
 
-// Export the controller functions for use in routes
+/**
+ * Get country by name
+ * Fetches a specific country by its name
+ */
+async function getCountryByName(req, res) {
+  try {
+    const { name } = req.params;
+    
+    if (!name) {
+      return res.status(400).json({ error: 'Country name is required' });
+    }
+    
+    // Fetch country data from REST Countries API
+    const response = await axios.get(`${REST_COUNTRIES_API}/name/${name}`);
+    
+    if (!response.data || response.data.length === 0) {
+      return res.status(404).json({ error: 'Country not found' });
+    }
+    
+    // Format the country data
+    const country = response.data[0];
+    const formattedData = {
+      name: country.name.common,
+      flag: country.flags.png,
+      capital: country.capital ? country.capital[0] : 'N/A',
+      currency: country.currencies ? {
+        name: Object.values(country.currencies)[0].name,
+        code: Object.keys(country.currencies)[0],
+        symbol: Object.values(country.currencies)[0].symbol
+      } : null,
+      languages: country.languages ? Object.values(country.languages) : []
+    };
+    
+    res.json(formattedData);
+    } catch (error) {
+    console.error('Error fetching country:', error);
+    if (error.response && error.response.status === 404) {
+      res.status(404).json({ error: 'Country not found' });
+        } else {
+      res.status(500).json({ error: 'Failed to fetch country data' });
+    }
+  }
+}
+
+/**
+ * Get countries with post counts
+ * Returns countries with the count of blog posts for each
+ */
+async function getCountriesWithPostCounts(req, res) {
+  try {
+    // This is a placeholder - in a real implementation, you would:
+    // 1. Fetch all countries from REST Countries API
+    // 2. Query your database for post counts by country
+    // 3. Combine the data
+    
+    // For now, we'll just return the countries
+    const response = await axios.get(`${REST_COUNTRIES_API}/all`);
+    
+    // Transform the data to match our expected format
+    const formattedData = response.data.map(country => ({
+      name: country.name.common,
+      flag: country.flags.png,
+      postCount: 0 // Placeholder - would be populated from database
+    }));
+    
+    res.json(formattedData);
+  } catch (error) {
+    console.error('Error fetching countries with post counts:', error);
+    res.status(500).json({ error: 'Failed to fetch countries with post counts' });
+  }
+}
+
 module.exports = {
     getAllCountries,
-    searchCountries
+  searchCountries,
+  getCountryByName,
+  getCountriesWithPostCounts
 }; 

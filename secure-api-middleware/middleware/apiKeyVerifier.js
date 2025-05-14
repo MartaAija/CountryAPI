@@ -3,7 +3,7 @@
  * This middleware validates and tracks usage of API keys before allowing access to protected endpoints.
  * It supports both primary and secondary API keys and updates their last used timestamps.
  */
-const db = require("../config/db"); // Database connection for verifying keys and updating usage
+const UserDAO = require("../models/UserDAO"); // User DAO for verifying API keys
 
 /**
  * Middleware function to verify API keys
@@ -21,47 +21,43 @@ module.exports = async (req, res, next) => {
     // Extract API key from custom header
     const apiKey = req.headers['x-api-key'];
     
-    // Check if API key is provided
+    // Public paths that can be accessed without API key
+    const publicPaths = [
+        '/posts',          // Public access to blog posts list
+        '/posts/'          // Public access to individual blog post
+    ];
+    
+    // Check if the request path matches any of the public paths
+    const isPublicPath = publicPaths.some(path => 
+        req.path === path || req.path.startsWith(path) && req.method === 'GET'
+    );
+    
+    // Allow access to public paths without an API key
+    if (isPublicPath) {
+        return next();
+    }
+    
+    // Check if API key is provided for protected paths
     if (!apiKey) {
         return res.status(401).json({ error: 'API key is required' });
     }
 
     try {
-        // Query database to verify if the API key exists and is active
-        // Note: Checks both primary and secondary keys with a single query
-        const [rows] = await db.query(
-            `SELECT id, api_key_primary, is_active_primary, api_key_secondary, is_active_secondary 
-             FROM users 
-             WHERE (api_key_primary = ? AND is_active_primary = 1) 
-             OR (api_key_secondary = ? AND is_active_secondary = 1)`,
-            [apiKey, apiKey]
-        );
-
+        // Verify API key and update last used timestamp
+        const result = await UserDAO.verifyApiKey(apiKey);
+        
         // If no matching active key is found, deny access
-        if (rows.length === 0) {
+        if (!result) {
             return res.status(401).json({ error: 'Invalid or inactive API key' });
         }
 
-        // Determine which key was used (primary or secondary) and update its usage timestamp
-        const user = rows[0];
-        if (apiKey === user.api_key_primary) {
-            // Update last_used timestamp for primary key
-            await db.query(
-                'UPDATE users SET last_used_primary = NOW() WHERE id = ?',
-                [user.id]
-            );
-        } else if (apiKey === user.api_key_secondary) {
-            // Update last_used timestamp for secondary key
-            await db.query(
-                'UPDATE users SET last_used_secondary = NOW() WHERE id = ?',
-                [user.id]
-            );
-        }
+        // Set user ID in request for potential future use
+        req.userId = result.userId;
 
         // API key is valid and timestamp updated, proceed to the actual route handler
         next();
     } catch (error) {
-        // Return a generic error to the client
-        res.status(500).json({ error: 'Internal server error' });
+        console.error('API Key Verification Error:', error);
+        res.status(500).json({ error: 'Server error during API key verification' });
     }
 }; 
