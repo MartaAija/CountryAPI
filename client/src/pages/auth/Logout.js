@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { logout } from "../../utils/authService";
 import '../../App.css';
 
 // Logout component that handles user session termination
@@ -9,17 +10,27 @@ function Logout() {
 
     // Perform logout actions immediately when component mounts
     useEffect(() => {
-        // Clear all authentication data from localStorage
-        localStorage.removeItem('token');
-        localStorage.removeItem('userId');
-        localStorage.removeItem('activeApiKey');
-        localStorage.removeItem('isAdmin');
+        const performLogout = async () => {
+            try {
+                // Call the authService logout function to clear cookies
+                await logout();
+                
+                // Also clear any extra localStorage items not handled by the logout function
+                localStorage.removeItem('token');
+                localStorage.removeItem('activeApiKey');
+                
+                console.log("Logout successful, redirecting to login page");
+                
+                // Navigate to login page
+                navigate('/login');
+            } catch (error) {
+                console.error("Logout error:", error);
+                // Navigate to login page even if there's an error
+                navigate('/login');
+            }
+        };
         
-        // Dispatch custom event to update UI
-        window.dispatchEvent(new Event('auth-change'));
-        
-        // Navigate to login page
-        navigate('/login');
+        performLogout();
     }, [navigate]);
 
     // Component doesn't render any visible UI

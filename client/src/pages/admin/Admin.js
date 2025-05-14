@@ -28,13 +28,24 @@ function Admin() {
 
     // Check admin authorization and load users data on component mount
     useEffect(() => {
-        // Check if user is admin
-        if (!isAdmin()) {
-            navigate('/login');
-            return;
-        }
+        const checkAdminStatus = async () => {
+            try {
+                // Check if user is admin (properly await the async function)
+                const adminStatus = await isAdmin();
+                if (!adminStatus) {
+                    navigate('/admin-login');
+                    return;
+                }
+                
+                // If admin, fetch users
+                fetchUsers();
+            } catch (error) {
+                console.error('Error checking admin status:', error);
+                navigate('/admin-login');
+            }
+        };
 
-        fetchUsers();
+        checkAdminStatus();
     }, [navigate]);
 
     // Helper function to mask API key for security

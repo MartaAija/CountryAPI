@@ -18,8 +18,6 @@ const pool = process.env.DATABASE_URL
       connectionLimit: 10,
       queueLimit: 0
     });
-    
-
 
 // Initialize database with schema matching existing database structure
 const initializeDatabase = async (retries = 10, delay = 5000) => {
@@ -29,9 +27,20 @@ const initializeDatabase = async (retries = 10, delay = 5000) => {
     try {
       connection = await pool.getConnection();
 
+      // Drop tables in reverse dependency order
+      await connection.query(`DROP TABLE IF EXISTS followers`);
+      await connection.query(`DROP TABLE IF EXISTS post_reactions`);
+      await connection.query(`DROP TABLE IF EXISTS comments`);
+      await connection.query(`DROP TABLE IF EXISTS blog_posts`);
+      await connection.query(`DROP TABLE IF EXISTS api_keys`);
+      await connection.query(`DROP TABLE IF EXISTS users`);
+      await connection.query(`DROP TABLE IF EXISTS countries`);
+
+      // Recreate tables in dependency order
+
       // Create countries table
       await connection.query(`
-        CREATE TABLE IF NOT EXISTS countries (
+        CREATE TABLE countries (
           id INT AUTO_INCREMENT PRIMARY KEY,
           name VARCHAR(100) COLLATE utf8mb4_general_ci NOT NULL,
           code VARCHAR(3) COLLATE utf8mb4_general_ci NOT NULL,
@@ -40,9 +49,9 @@ const initializeDatabase = async (retries = 10, delay = 5000) => {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
       `);
 
-      // Create users table with verification fields
+      // Create users table
       await connection.query(`
-        CREATE TABLE IF NOT EXISTS users (
+        CREATE TABLE users (
           id INT AUTO_INCREMENT PRIMARY KEY,
           username VARCHAR(45) COLLATE utf8mb4_general_ci NOT NULL,
           password_hash VARCHAR(255) COLLATE utf8mb4_general_ci NOT NULL,
@@ -69,7 +78,7 @@ const initializeDatabase = async (retries = 10, delay = 5000) => {
 
       // Create api_keys table
       await connection.query(`
-        CREATE TABLE IF NOT EXISTS api_keys (
+        CREATE TABLE api_keys (
           id INT AUTO_INCREMENT PRIMARY KEY,
           user_id INT NOT NULL,
           key_value VARCHAR(50) COLLATE utf8mb4_general_ci NOT NULL,
@@ -85,7 +94,7 @@ const initializeDatabase = async (retries = 10, delay = 5000) => {
 
       // Create blog_posts table
       await connection.query(`
-        CREATE TABLE IF NOT EXISTS blog_posts (
+        CREATE TABLE blog_posts (
           id INT AUTO_INCREMENT PRIMARY KEY,
           user_id INT NOT NULL,
           title VARCHAR(255) NOT NULL,
@@ -101,7 +110,7 @@ const initializeDatabase = async (retries = 10, delay = 5000) => {
 
       // Create comments table
       await connection.query(`
-        CREATE TABLE IF NOT EXISTS comments (
+        CREATE TABLE comments (
           id INT AUTO_INCREMENT PRIMARY KEY,
           post_id INT NOT NULL,
           user_id INT NOT NULL,
@@ -117,7 +126,7 @@ const initializeDatabase = async (retries = 10, delay = 5000) => {
 
       // Create post_reactions table
       await connection.query(`
-        CREATE TABLE IF NOT EXISTS post_reactions (
+        CREATE TABLE post_reactions (
           id INT AUTO_INCREMENT PRIMARY KEY,
           post_id INT NOT NULL,
           user_id INT NOT NULL,
@@ -131,7 +140,7 @@ const initializeDatabase = async (retries = 10, delay = 5000) => {
 
       // Create followers table
       await connection.query(`
-        CREATE TABLE IF NOT EXISTS followers (
+        CREATE TABLE followers (
           id INT AUTO_INCREMENT PRIMARY KEY,
           follower_id INT NOT NULL,
           following_id INT NOT NULL,
@@ -143,7 +152,7 @@ const initializeDatabase = async (retries = 10, delay = 5000) => {
       `);
 
       connection.release();
-      console.log('Database tables initialized successfully');
+      console.log('Database tables dropped and recreated successfully');
       return;
 
     } catch (error) {

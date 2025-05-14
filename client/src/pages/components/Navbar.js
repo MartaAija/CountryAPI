@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { isAuthenticated, isAdmin } from '../../utils/authService';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { isAuthenticated, isAdmin, logout } from '../../utils/authService';
 import '../../App.css'; 
 
 // Main navigation component that dynamically updates based on user authentication status
 function Navbar() {
     // Get current location to highlight active navigation link
     const location = useLocation();
+    const navigate = useNavigate();
     const currentUserId = localStorage.getItem('userId');
     
     // Use state to track authentication status
@@ -22,19 +23,54 @@ function Navbar() {
             try {
                 // Check authentication status from cookies via API
                 const authStatus = await isAuthenticated();
+                console.log('Authentication status:', authStatus);
+                
+                // Get the localStorage admin status
+                const localStorageAdmin = localStorage.getItem('isAdmin') === 'true';
+                const localStorageUserId = localStorage.getItem('userId');
+                
+                // If localStorage says user is authenticated but cookies say they aren't,
+                // we need to perform a full logout to sync the state
+                if (!authStatus && (localStorageUserId || localStorageAdmin)) {
+                    console.log('Cookie auth and localStorage out of sync, performing cleanup');
+                    await logout();
+                    setUserAuthenticated(false);
+                    setUserIsAdmin(false);
+                    setLoading(false);
+                    return;
+                }
+                
                 setUserAuthenticated(authStatus);
                 
                 // Only check admin status if user is authenticated
                 if (authStatus) {
                     const adminStatus = await isAdmin();
+                    console.log('Admin status:', adminStatus);
+                    
+                    // If API says not admin but localStorage says admin, fix the mismatch
+                    if (!adminStatus && localStorageAdmin) {
+                        console.log('Admin status mismatch, fixing...');
+                        localStorage.removeItem('isAdmin');
+                    }
+                    
                     setUserIsAdmin(adminStatus);
                 } else {
                     setUserIsAdmin(false);
+                    
+                    // If not authenticated, clear localStorage items
+                    localStorage.removeItem('userId');
+                    localStorage.removeItem('username');
+                    localStorage.removeItem('isAdmin');
                 }
             } catch (error) {
                 console.error('Error checking authentication:', error);
                 setUserAuthenticated(false);
                 setUserIsAdmin(false);
+                
+                // Clear localStorage on error
+                localStorage.removeItem('userId');
+                localStorage.removeItem('username');
+                localStorage.removeItem('isAdmin');
             } finally {
                 setLoading(false);
             }
@@ -44,13 +80,26 @@ function Navbar() {
         updateAuthState();
         
         // Listen for custom auth change events
-        const handleAuthChange = () => updateAuthState();
+        const handleAuthChange = () => {
+            console.log('Auth change event detected');
+            updateAuthState();
+        };
+        
         window.addEventListener('auth-change', handleAuthChange);
+        
+        // Also recheck auth state on route changes to keep nav updated
+        const checkAuthOnRouteChange = () => {
+            if (location.pathname === '/logout') {
+                console.log('Logout route detected, will update auth state');
+                setTimeout(updateAuthState, 500); // Small delay to ensure logout completes
+            }
+        };
+        checkAuthOnRouteChange();
         
         return () => {
             window.removeEventListener('auth-change', handleAuthChange);
         };
-    }, []);
+    }, [location.pathname]);
 
     // Helper function to determine if a nav link should be highlighted as active
     const isActiveLink = (path, param = null) => {

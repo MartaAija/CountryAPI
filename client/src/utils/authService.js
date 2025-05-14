@@ -78,10 +78,10 @@ export const adminLogin = async (username, password) => {
     );
     
     // Store admin flag in localStorage for UI purposes only
-    if (response.data.userId) {
+    if (response.data.success) {
       localStorage.setItem('isAdmin', 'true');
-      localStorage.setItem('userId', response.data.userId);
-      localStorage.setItem('username', response.data.username);
+      localStorage.setItem('userId', 'admin');
+      localStorage.setItem('username', 'admin');
       notifyAuthChange();
     }
     

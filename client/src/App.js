@@ -1,5 +1,5 @@
-import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import Navbar from './pages/components/Navbar';
 import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
@@ -17,24 +17,54 @@ import BlogForm from './pages/blog/BlogForm';
 import PostView from './pages/blog/PostView';
 import UserProfile from './pages/blog/UserProfile';
 import FeedPage from './pages/blog/FeedPage';
+import { isAuthenticated, isAdmin } from './utils/authService';
 import './App.css';
 
 // Custom component for protected routes that redirects unauthenticated users to login
 // Takes an optional adminRequired parameter to restrict routes to admin users only
 const PrivateRoute = ({ children, adminRequired = false }) => {
-  // Check if user is authenticated
-  const isAuthenticated = localStorage.getItem('token') !== null;
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isAuth, setIsAuth] = useState(false);
+  const [isAdminUser, setIsAdminUser] = useState(false);
+  const navigate = useNavigate();
 
-  // Check if user has admin privileges
-  const isAdmin = localStorage.getItem('isAdmin') === 'true';
-
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        // Check authentication status using secure cookie-based method
+        const authStatus = await isAuthenticated();
+        setIsAuth(authStatus);
+        
+        // If admin route, also check admin status
+        if (adminRequired && authStatus) {
+          const adminStatus = await isAdmin();
+          setIsAdminUser(adminStatus);
+        }
+        
+        setAuthChecked(true);
+      } catch (error) {
+        console.error('Auth check error:', error);
+        setIsAuth(false);
+        setIsAdminUser(false);
+        setAuthChecked(true);
+      }
+    };
+    
+    checkAuth();
+  }, [adminRequired]);
+  
+  // Show loading state while checking authentication
+  if (!authChecked) {
+    return <div className="loading">Checking authentication...</div>;
+  }
+  
   // For admin routes, check both authentication and admin status
-    if (adminRequired) {
-    if (!isAuthenticated) {
+  if (adminRequired) {
+    if (!isAuth) {
       return <Navigate to="/login" />;
     }
     
-    if (!isAdmin) {
+    if (!isAdminUser) {
       return <Navigate to="/dashboard" />;
     }
     
@@ -42,8 +72,8 @@ const PrivateRoute = ({ children, adminRequired = false }) => {
   }
   
   // For regular protected routes, just check authentication
-  return isAuthenticated ? children : <Navigate to="/login" />;
-  };
+  return isAuth ? children : <Navigate to="/login" />;
+};
 
 function App() {
   return (

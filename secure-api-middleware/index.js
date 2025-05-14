@@ -36,7 +36,7 @@ app.use(helmet({
       imgSrc: ["'self'", "data:", "https://flagcdn.com", "https://restcountries.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       connectSrc: ["'self'", process.env.NODE_ENV === 'production' 
-        ? "https://country-explorer-w1888516.netlify.app" 
+        ? "https://traveltalesblog.netlify.app" 
         : "http://localhost:3000"],
       frameSrc: ["'none'"],
       objectSrc: ["'none'"],
