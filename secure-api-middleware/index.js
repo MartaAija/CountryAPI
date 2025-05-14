@@ -59,7 +59,7 @@ app.use(helmet({
 // CORS configuration - Allow requests from any origin during development
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? ['https://country-explorer-w1888516.netlify.app'] 
+    ? ['https://traveltalesblog.netlify.app'] 
     : ['http://localhost:3000'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
