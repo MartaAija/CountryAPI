@@ -125,10 +125,30 @@ export const getProfile = async () => {
  * @returns {Promise<boolean>} - True if user has valid session
  */
 export const checkSession = async () => {
+  // First check if we have any auth-related items in localStorage 
+  // to avoid unnecessary API calls when clearly not authenticated
+  const hasLocalStorageAuth = !!(
+    localStorage.getItem('userId') || 
+    localStorage.getItem('username') || 
+    localStorage.getItem('isAdmin')
+  );
+  
+  // If we have no auth data in localStorage, return false immediately
+  // without making an API call that would result in a 401
+  if (!hasLocalStorageAuth) {
+    return false;
+  }
+  
   try {
     const response = await apiClient.get('/auth/session');
     return response.data.authenticated || false;
   } catch (error) {
+    // Silently handle 401 errors as expected for unauthenticated state
+    if (error.response && error.response.status === 401) {
+      return false;
+    }
+    // Log other unexpected errors
+    console.error('Unexpected error in session check:', error);
     return false;
   }
 };
@@ -138,12 +158,10 @@ export const checkSession = async () => {
  * @returns {Promise<boolean>} - True if user is authenticated
  */
 export const isAuthenticated = async () => {
-  // Check session via HttpOnly cookie
   try {
     const sessionValid = await checkSession();
     return sessionValid;
   } catch (error) {
-    console.error('Session check failed:', error);
     return false;
   }
 };
@@ -153,12 +171,32 @@ export const isAuthenticated = async () => {
  * @returns {Promise<boolean>} - True if user is admin
  */
 export const isAdmin = async () => {
+  // First check if we have admin flag in localStorage
+  // to avoid unnecessary API calls
+  const hasAdminFlag = localStorage.getItem('isAdmin') === 'true';
+  
+  // Also check if we're authenticated at all to avoid unnecessary API calls
+  const hasAuth = !!(
+    localStorage.getItem('userId') ||
+    localStorage.getItem('username')
+  );
+  
+  // If there's no admin flag or no auth data, no need to make an API call
+  if (!hasAdminFlag || !hasAuth) {
+    return false;
+  }
+  
   // Check admin status via HttpOnly cookie
   try {
     const response = await apiClient.get('/auth/admin-check');
     return response.data.isAdmin || false;
   } catch (error) {
-    console.error('Admin check failed:', error);
+    // Silently handle 401 errors as expected for unauthenticated state
+    if (error.response && error.response.status === 401) {
+      return false;
+    }
+    // Log other unexpected errors
+    console.error('Unexpected admin check error:', error);
     return false;
   }
 };

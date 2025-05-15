@@ -23,7 +23,10 @@ function Navbar() {
             try {
                 // Check authentication status from cookies via API
                 const authStatus = await isAuthenticated();
-                console.log('Authentication status:', authStatus);
+                // Only log auth status in development
+                if (process.env.NODE_ENV === 'development') {
+                    console.log('Authentication status:', authStatus);
+                }
                 
                 // Get the localStorage admin status
                 const localStorageAdmin = localStorage.getItem('isAdmin') === 'true';
@@ -32,7 +35,9 @@ function Navbar() {
                 // If localStorage says user is authenticated but cookies say they aren't,
                 // we need to perform a full logout to sync the state
                 if (!authStatus && (localStorageUserId || localStorageAdmin)) {
-                    console.log('Cookie auth and localStorage out of sync, performing cleanup');
+                    if (process.env.NODE_ENV === 'development') {
+                        console.log('Cookie auth and localStorage out of sync, performing cleanup');
+                    }
                     await logout();
                     setUserAuthenticated(false);
                     setUserIsAdmin(false);
@@ -45,11 +50,15 @@ function Navbar() {
                 // Only check admin status if user is authenticated
                 if (authStatus) {
                     const adminStatus = await isAdmin();
-                    console.log('Admin status:', adminStatus);
+                    if (process.env.NODE_ENV === 'development') {
+                        console.log('Admin status:', adminStatus);
+                    }
                     
                     // If API says not admin but localStorage says admin, fix the mismatch
                     if (!adminStatus && localStorageAdmin) {
-                        console.log('Admin status mismatch, fixing...');
+                        if (process.env.NODE_ENV === 'development') {
+                            console.log('Admin status mismatch, fixing...');
+                        }
                         localStorage.removeItem('isAdmin');
                     }
                     
@@ -81,7 +90,9 @@ function Navbar() {
         
         // Listen for custom auth change events
         const handleAuthChange = () => {
-            console.log('Auth change event detected');
+            if (process.env.NODE_ENV === 'development') {
+                console.log('Auth change event detected');
+            }
             updateAuthState();
         };
         
@@ -90,7 +101,9 @@ function Navbar() {
         // Also recheck auth state on route changes to keep nav updated
         const checkAuthOnRouteChange = () => {
             if (location.pathname === '/logout') {
-                console.log('Logout route detected, will update auth state');
+                if (process.env.NODE_ENV === 'development') {
+                    console.log('Logout route detected, will update auth state');
+                }
                 setTimeout(updateAuthState, 500); // Small delay to ensure logout completes
             }
         };
