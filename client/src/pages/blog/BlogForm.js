@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import apiClient, { formatErrorMessage } from '../../utils/apiClient';
 import config from '../../config';
-import { getBlogApiUrl } from '../../utils/apiUtils';
+import { getBlogApiUrl, blogApiPut } from '../../utils/apiUtils';
 import '../../App.css';
 
 function BlogForm() {
@@ -21,8 +21,6 @@ function BlogForm() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [submitLoading, setSubmitLoading] = useState(false);
-  const [image, setImage] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState('');
   const [success, setSuccess] = useState('');
 
   useEffect(() => {
@@ -87,33 +85,6 @@ function BlogForm() {
     }));
   };
 
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    
-    // Check file size (limit to 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Image size exceeds 5MB limit.');
-      return;
-    }
-    
-    // Check file type
-    const validTypes = ['image/jpeg', 'image/png', 'image/gif'];
-    if (!validTypes.includes(file.type)) {
-      setError('Invalid file type. Please upload a JPEG, PNG, or GIF image.');
-      return;
-    }
-    
-    setImage(file);
-    
-    // Create preview URL
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setPreviewUrl(reader.result);
-    };
-    reader.readAsDataURL(file);
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitLoading(true);
@@ -147,20 +118,16 @@ function BlogForm() {
         visit_date: formData.visit_date
       };
 
-      if (image) {
-        const formData = new FormData();
-        formData.append('title', formData.title);
-        formData.append('content', formData.content);
-        formData.append('country_name', formData.country_name);
-        formData.append('visit_date', formData.visit_date);
-        formData.append('image', image);
-
-        await apiClient.put(`/blog/posts/${id}`, formData);
+      if (isEditMode) {
+        // Use the blogApiPut utility function instead of direct apiClient call
+        await blogApiPut(`/posts/${id}`, postData, { headers });
+        setSuccess('Post updated successfully!');
       } else {
-        await apiClient.put(`/blog/posts/${id}`, postData, { headers });
+        // For new posts
+        await apiClient.post('/blog/posts', postData, { headers });
+        setSuccess('Post created successfully!');
       }
       
-      setSuccess('Post updated successfully!');
       setTimeout(() => {
         navigate('/blog');
       }, 1500);
@@ -276,17 +243,6 @@ function BlogForm() {
               placeholder="Share your experiences, tips, and memorable moments..."
               required
             ></textarea>
-          </div>
-          
-          <div className="form-group">
-            <label htmlFor="image">Image</label>
-            <input
-              type="file"
-              id="image"
-              name="image"
-              accept="image/*"
-              onChange={handleImageChange}
-            />
           </div>
           
           <div className="form-actions">

@@ -16,21 +16,24 @@ export const getBlogApiUrl = (path) => {
   const pathStr = String(path || '');
   let url;
   
-  // Format the path to match the backend routes structure
-  if (pathStr.startsWith('/api/blog/')) {
-    // Convert /api/blog/posts to /blog/api/posts
-    url = `${config.apiBaseUrl}/blog${pathStr.substring(9)}`;
-  } else if (pathStr.startsWith('/blog/api/')) {
-    // Already in the correct format
-    url = `${config.apiBaseUrl}${pathStr}`;
-  } else if (!pathStr.startsWith('/blog/')) {
-    // If it doesn't start with /blog/, add it
+  // If path is empty or undefined, default to /blog
+  if (!pathStr) {
+    return { url: `${config.apiBaseUrl}/blog` };
+  }
+  
+  // Ensure the path starts with /blog in all cases
+  if (pathStr.startsWith('/posts') || 
+      pathStr.startsWith('/users') || 
+      pathStr.startsWith('/comments') ||
+      !pathStr.startsWith('/blog')) {
+    // Standard blog API endpoints
     url = `${config.apiBaseUrl}/blog${pathStr.startsWith('/') ? pathStr : '/' + pathStr}`;
   } else {
-    // If it's already in the correct format
+    // If it's already in the blog/ format
     url = `${config.apiBaseUrl}${pathStr}`;
   }
   
+  console.log(`Blog API URL: ${url}`); // Debugging log
   return { url };
 };
 
@@ -64,7 +67,8 @@ export const getCountriesApiUrl = (path) => {
  */
 export const blogApiGet = async (path, options = {}) => {
   const { url } = getBlogApiUrl(path);
-  return apiClient.get(url.replace(config.apiBaseUrl, ''), options);
+  console.log(`Making GET request to: ${url}`);
+  return apiClient.get(url, options);
 };
 
 /**
@@ -76,7 +80,8 @@ export const blogApiGet = async (path, options = {}) => {
  */
 export const blogApiPost = async (path, data = {}, options = {}) => {
   const { url } = getBlogApiUrl(path);
-  return apiClient.post(url.replace(config.apiBaseUrl, ''), data, options);
+  console.log(`Making POST request to: ${url}`);
+  return apiClient.post(url, data, options);
 };
 
 /**
@@ -88,7 +93,8 @@ export const blogApiPost = async (path, data = {}, options = {}) => {
  */
 export const blogApiPut = async (path, data = {}, options = {}) => {
   const { url } = getBlogApiUrl(path);
-  return apiClient.put(url.replace(config.apiBaseUrl, ''), data, options);
+  console.log(`Making PUT request to: ${url}`);
+  return apiClient.put(url, data, options);
 };
 
 /**
@@ -99,5 +105,6 @@ export const blogApiPut = async (path, data = {}, options = {}) => {
  */
 export const blogApiDelete = async (path, options = {}) => {
   const { url } = getBlogApiUrl(path);
-  return apiClient.delete(url.replace(config.apiBaseUrl, ''), options);
+  console.log(`Making DELETE request to: ${url}`);
+  return apiClient.delete(url, options);
 };

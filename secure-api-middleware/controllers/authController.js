@@ -170,8 +170,6 @@ async function loginUser(req, res) {
             });
         }
 
-        console.log('Password verified, generating token');
-
         // Create JWT token with user information
         const token = jwt.sign(
             { id: user.id, username: user.username }, 
@@ -186,8 +184,6 @@ async function loginUser(req, res) {
             sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
             maxAge: 3600000 // 1 hour
         });
-
-        console.log('Login successful for user:', username);
         
         // Log successful login
         securityLogger.logAuthEvent('login_success', {
@@ -670,7 +666,6 @@ async function toggleApiKeyStatus(req, res) {
                  WHERE user_id = ? AND key_type = ?`,
                 [userId, otherKeyType]
             );
-            console.log(`Deactivated ${otherKeyType} key for user ${userId}`);
         }
         
         // Update API key status

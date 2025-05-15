@@ -51,6 +51,12 @@ apiClient.interceptors.request.use(async config => {
     config.headers['X-API-Key'] = apiKey;
   }
   
+  // If a full URL is provided in the url (starts with http), use that instead of baseURL
+  if (config.url && (config.url.startsWith('http://') || config.url.startsWith('https://'))) {
+    config.baseURL = ''; // Don't use baseURL for absolute URLs
+    console.log(`Using full URL: ${config.url}`);
+  }
+  
   return config;
 });
 

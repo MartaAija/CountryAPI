@@ -27,20 +27,9 @@ const initializeDatabase = async (retries = 10, delay = 5000) => {
     try {
       connection = await pool.getConnection();
 
-      // Drop tables in reverse dependency order
-      await connection.query(`DROP TABLE IF EXISTS followers`);
-      await connection.query(`DROP TABLE IF EXISTS post_reactions`);
-      await connection.query(`DROP TABLE IF EXISTS comments`);
-      await connection.query(`DROP TABLE IF EXISTS blog_posts`);
-      await connection.query(`DROP TABLE IF EXISTS api_keys`);
-      await connection.query(`DROP TABLE IF EXISTS users`);
-      await connection.query(`DROP TABLE IF EXISTS countries`);
-
-      // Recreate tables in dependency order
-
       // Create countries table
       await connection.query(`
-        CREATE TABLE countries (
+        CREATE TABLE IF NOT EXISTS countries (
           id INT AUTO_INCREMENT PRIMARY KEY,
           name VARCHAR(100) COLLATE utf8mb4_general_ci NOT NULL,
           code VARCHAR(3) COLLATE utf8mb4_general_ci NOT NULL,
@@ -51,7 +40,7 @@ const initializeDatabase = async (retries = 10, delay = 5000) => {
 
       // Create users table
       await connection.query(`
-        CREATE TABLE users (
+        CREATE TABLE IF NOT EXISTS users (
           id INT AUTO_INCREMENT PRIMARY KEY,
           username VARCHAR(45) COLLATE utf8mb4_general_ci NOT NULL,
           password_hash VARCHAR(255) COLLATE utf8mb4_general_ci NOT NULL,
@@ -78,7 +67,7 @@ const initializeDatabase = async (retries = 10, delay = 5000) => {
 
       // Create api_keys table
       await connection.query(`
-        CREATE TABLE api_keys (
+        CREATE TABLE IF NOT EXISTS api_keys (
           id INT AUTO_INCREMENT PRIMARY KEY,
           user_id INT NOT NULL,
           key_value VARCHAR(50) COLLATE utf8mb4_general_ci NOT NULL,
@@ -94,7 +83,7 @@ const initializeDatabase = async (retries = 10, delay = 5000) => {
 
       // Create blog_posts table
       await connection.query(`
-        CREATE TABLE blog_posts (
+        CREATE TABLE IF NOT EXISTS blog_posts (
           id INT AUTO_INCREMENT PRIMARY KEY,
           user_id INT NOT NULL,
           title VARCHAR(255) NOT NULL,
@@ -110,7 +99,7 @@ const initializeDatabase = async (retries = 10, delay = 5000) => {
 
       // Create comments table
       await connection.query(`
-        CREATE TABLE comments (
+        CREATE TABLE IF NOT EXISTS comments (
           id INT AUTO_INCREMENT PRIMARY KEY,
           post_id INT NOT NULL,
           user_id INT NOT NULL,
@@ -126,7 +115,7 @@ const initializeDatabase = async (retries = 10, delay = 5000) => {
 
       // Create post_reactions table
       await connection.query(`
-        CREATE TABLE post_reactions (
+        CREATE TABLE IF NOT EXISTS post_reactions (
           id INT AUTO_INCREMENT PRIMARY KEY,
           post_id INT NOT NULL,
           user_id INT NOT NULL,
@@ -140,7 +129,7 @@ const initializeDatabase = async (retries = 10, delay = 5000) => {
 
       // Create followers table
       await connection.query(`
-        CREATE TABLE followers (
+        CREATE TABLE IF NOT EXISTS followers (
           id INT AUTO_INCREMENT PRIMARY KEY,
           follower_id INT NOT NULL,
           following_id INT NOT NULL,
@@ -152,7 +141,7 @@ const initializeDatabase = async (retries = 10, delay = 5000) => {
       `);
 
       connection.release();
-      console.log('Database tables dropped and recreated successfully');
+      console.log('Database tables created successfully');
       return;
 
     } catch (error) {
@@ -177,3 +166,15 @@ initializeDatabase();
 
 // Export the pool for use in other modules
 module.exports = pool;
+
+/*
+ * Note on Database Normalization:
+ * The users table contains authentication token fields that could be normalized into separate tables.
+ * This denormalization is intentional for:
+ * 1. Performance - avoiding joins on critical authentication flows
+ * 2. Simplicity - keeping related security tokens with the user record
+ * 3. Transactional integrity - ensuring atomic operations for security processes
+ * 
+ * These tokens are temporary by nature and are invalidated after use, making
+ * this a common and practical approach for authentication systems.
+ */
