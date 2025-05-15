@@ -34,7 +34,8 @@ function BlogForm() {
     // Fetch countries for dropdown
     const fetchCountries = async () => {
       try {
-        const response = await apiClient.get('/countries/api');
+        // Use the public endpoint instead of the protected one
+        const response = await apiClient.get('/countries');
         if (response.data && Array.isArray(response.data)) {
           setCountries(response.data);
         }
