@@ -1630,7 +1630,6 @@ form.form-group input[type="password"] {
 }
 
 .info-label-pair strong {
-  width: 100px;
   flex-shrink: 0;
 }
 
@@ -2532,6 +2531,7 @@ form.form-group input[type="password"] {
   text-overflow: ellipsis;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
 }
 
@@ -2544,6 +2544,7 @@ form.form-group input[type="password"] {
   text-overflow: ellipsis;
   display: -webkit-box;
   -webkit-line-clamp: 3;
+  line-clamp: 3;
   -webkit-box-orient: vertical;
   flex-grow: 1;
 }
