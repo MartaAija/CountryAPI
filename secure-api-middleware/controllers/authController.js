@@ -28,7 +28,7 @@ async function registerUser(req, res) {
         const email = sanitizeEmail(req.body.email);
         const first_name = sanitizeString(req.body.first_name);
         const last_name = sanitizeString(req.body.last_name);
-        const password = req.body.password; // Don't sanitize passwords as they will be hashed
+        const password = req.body.password; // Not sanitizing passwords as they will be hashed
         
         // Validate sanitized inputs
         if (!username || username !== req.body.username) {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { blogApiGet, blogApiPost, blogApiDelete } from '../../utils/apiUtils';
 import { formatErrorMessage } from '../../utils/apiClient';
@@ -16,6 +16,19 @@ function PostView() {
   const [replyContent, setReplyContent] = useState('');
   const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
 
+  const fetchPost = useCallback(async () => {
+    try {
+      // Use blogApiGet with throttling protection
+      const response = await blogApiGet(`/posts/${id}`);
+      setPost(response.data);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching post:', error);
+      setError(formatErrorMessage(error));
+      setLoading(false);
+    }
+  }, [id]);
+
   useEffect(() => {
     // Check authentication status
     const checkAuth = async () => {
@@ -30,20 +43,7 @@ function PostView() {
     
     checkAuth();
     fetchPost();
-  }, [id]);
-
-  const fetchPost = async () => {
-    try {
-      // Use blogApiGet with throttling protection
-      const response = await blogApiGet(`/posts/${id}`);
-      setPost(response.data);
-      setLoading(false);
-    } catch (error) {
-      console.error('Error fetching post:', error);
-      setError(formatErrorMessage(error));
-      setLoading(false);
-    }
-  };
+  }, [fetchPost]);
 
   const handleReaction = async (action) => {
     if (!isUserLoggedIn) {

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useLocation} from 'react-router-dom';
 import { isAuthenticated, isAdmin, logout } from '../../utils/authService';
 import '../../App.css'; 
 
@@ -18,7 +18,6 @@ import '../../App.css';
 function Navbar() {
     // Get current location to highlight active navigation link
     const location = useLocation();
-    const navigate = useNavigate();
     const currentUserId = localStorage.getItem('userId');
     
     // Use state to track authentication status

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import apiClient, { formatErrorMessage } from '../utils/apiClient';
+import { formatErrorMessage } from '../utils/apiClient';
 import { blogApiGet } from '../utils/apiUtils';
 import { isAuthenticated } from '../utils/authService';
 import '../App.css';

@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import '../../App.css';
-import config from '../../config';
 import { blogApiGet, blogApiPost } from '../../utils/apiUtils';
 import { formatErrorMessage } from '../../utils/apiClient';
 
@@ -22,6 +21,38 @@ function BlogList() {
   const searchRef = useRef(null);
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
+
+  const fetchPosts = useCallback(async (page = 1) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Construct query parameters for filtering
+      const queryParams = new URLSearchParams();
+      queryParams.append('page', page);
+      queryParams.append('limit', 10);
+      
+      if (filterCountry) {
+        queryParams.append('countryName', filterCountry);
+      }
+      
+      if (searchUsername) {
+        queryParams.append('username', searchUsername);
+      }
+      
+      // Use the new blogApiGet function that automatically uses apiClient
+      const response = await blogApiGet(`/posts?${queryParams.toString()}`);
+      setPosts(response.data.posts);
+      setTotalPages(response.data.pagination.totalPages);
+    } catch (error) {
+      console.error('Error fetching posts:', error);
+      setError(formatErrorMessage(error));
+      setPosts([]);
+      setTotalPages(1);
+    } finally {
+      setLoading(false);
+    }
+  }, [filterCountry, searchUsername]);
 
   useEffect(() => {
     // Fetch countries for filter dropdown
@@ -73,40 +104,8 @@ function BlogList() {
   }, []);
 
   useEffect(() => {
-    fetchPosts();
-  }, [currentPage, filterCountry, sortBy]);
-
-  const fetchPosts = async (page = 1) => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      // Construct query parameters for filtering
-      const queryParams = new URLSearchParams();
-      queryParams.append('page', page);
-      queryParams.append('limit', 10);
-      
-      if (filterCountry) {
-        queryParams.append('countryName', filterCountry);
-      }
-      
-      if (searchUsername) {
-        queryParams.append('username', searchUsername);
-      }
-      
-      // Use the new blogApiGet function that automatically uses apiClient
-      const response = await blogApiGet(`/posts?${queryParams.toString()}`);
-      setPosts(response.data.posts);
-      setTotalPages(response.data.pagination.totalPages);
-    } catch (error) {
-      console.error('Error fetching posts:', error);
-      setError(formatErrorMessage(error));
-      setPosts([]);
-      setTotalPages(1);
-    } finally {
-      setLoading(false);
-    }
-  };
+    fetchPosts(currentPage);
+  }, [currentPage, filterCountry, sortBy, fetchPosts]);
 
   const handlePageChange = (newPage) => {
     setCurrentPage(newPage);

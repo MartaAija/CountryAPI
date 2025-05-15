@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import Navbar from './pages/components/Navbar';
 import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
@@ -26,7 +26,6 @@ const PrivateRoute = ({ children, adminRequired = false }) => {
   const [authChecked, setAuthChecked] = useState(false);
   const [isAuth, setIsAuth] = useState(false);
   const [isAdminUser, setIsAdminUser] = useState(false);
-  const navigate = useNavigate();
 
   useEffect(() => {
     const checkAuth = async () => {

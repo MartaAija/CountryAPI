@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import  { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient, { formatErrorMessage } from '../../utils/apiClient';
 import '../../App.css';
-import config from '../../config';
 import { isAdmin } from '../../utils/authService';
 
 // Admin component - administrative dashboard for managing users and API keys
@@ -26,6 +25,32 @@ function Admin() {
     const [showDeleteBlogModal, setShowDeleteBlogModal] = useState(false);
     const [selectedBlog, setSelectedBlog] = useState(null);
 
+    // Fetch all users from the API
+    const fetchUsers = useCallback(async () => {
+        try {
+            setLoading(true);
+            
+            // Make API call to fetch users with credentials
+            const response = await apiClient.get('/admin/users');
+            
+            setUsers(response.data);
+            // Reset key visibility when loading new data
+            setVisibleKeys({});
+            setExpandedBlogs({});
+            setUserBlogs({});
+        } catch (error) {
+            console.error('Error fetching users:', error);
+            setMessage('Failed to fetch users: ' + formatErrorMessage(error));
+            
+            // If unauthorized, redirect to login
+            if (error.response?.status === 401 || error.response?.status === 403) {
+                navigate('/admin/login');
+            }
+        } finally {
+            setLoading(false);
+        }
+    }, [navigate]);
+
     // Check admin authorization and load users data on component mount
     useEffect(() => {
         const checkAdminStatus = async () => {
@@ -46,7 +71,7 @@ function Admin() {
         };
 
         checkAdminStatus();
-    }, [navigate]);
+    }, [navigate, fetchUsers]);
 
     // Helper function to mask API key for security
     const maskApiKey = (key) => {
@@ -70,32 +95,6 @@ function Admin() {
     const isKeyVisible = (userId, keyType) => {
         const key = `${userId}-${keyType}`;
         return visibleKeys[key] || false;
-    };
-
-    // Fetch all users from the API
-    const fetchUsers = async () => {
-        try {
-            setLoading(true);
-            
-            // Make API call to fetch users with credentials
-            const response = await apiClient.get('/admin/users');
-            
-            setUsers(response.data);
-            // Reset key visibility when loading new data
-            setVisibleKeys({});
-            setExpandedBlogs({});
-            setUserBlogs({});
-        } catch (error) {
-            console.error('Error fetching users:', error);
-            setMessage('Failed to fetch users: ' + formatErrorMessage(error));
-            
-            // If unauthorized, redirect to login
-            if (error.response?.status === 401 || error.response?.status === 403) {
-                navigate('/admin/login');
-            }
-        } finally {
-            setLoading(false);
-        }
     };
 
     // Toggle API key activation status (activate/deactivate)

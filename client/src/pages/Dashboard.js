@@ -173,15 +173,6 @@ function Dashboard() {
         }
     };
 
-    // Handle API errors with specific messages for different error types
-    const handleApiError = (error) => {
-        if (error.response?.status === 401) {
-            setError('Invalid or inactive API key. Please check your API key in Settings.');
-        } else {
-            setError(formatErrorMessage(error));
-        }
-    };
-
     // Hide suggestions dropdown
     const hideDropdown = () => {
         setShowSuggestions(false);

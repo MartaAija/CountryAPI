@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import apiClient, { formatErrorMessage } from '../../utils/apiClient';
-import config from '../../config';
 import { getBlogApiUrl, blogApiPut } from '../../utils/apiUtils';
 import '../../App.css';
 
@@ -22,6 +21,29 @@ function BlogForm() {
   const [error, setError] = useState('');
   const [submitLoading, setSubmitLoading] = useState(false);
   const [success, setSuccess] = useState('');
+
+  const fetchPostData = useCallback(async () => {
+    try {
+      const { url } = getBlogApiUrl(`/posts/${id}`);
+      const response = await apiClient.get(url);
+      const { title, content, country_name } = response.data;
+      
+      setFormData({
+        title,
+        content,
+        country_name,
+        visit_date: response.data.visit_date.split('T')[0]
+      });
+      setLoading(false);
+    } catch (error) {
+      if (error.response?.status === 404) {
+        setError('Blog post not found');
+      } else {
+        setError('Failed to fetch blog post data');
+      }
+      setLoading(false);
+    }
+  }, [id]);
 
   useEffect(() => {
     // Check if user is logged in
@@ -47,36 +69,13 @@ function BlogForm() {
 
     fetchCountries();
         
-        // If edit mode, fetch the post data
-        if (isEditMode) {
-          fetchPostData();
-        } else {
-          setLoading(false);
-        }
-  }, [isEditMode, id, navigate, location.pathname]);
-
-  const fetchPostData = async () => {
-    try {
-      const { url } = getBlogApiUrl(`/posts/${id}`);
-      const response = await apiClient.get(url);
-      const { title, content, country_name } = response.data;
-      
-      setFormData({
-        title,
-        content,
-        country_name,
-        visit_date: response.data.visit_date.split('T')[0]
-      });
-      setLoading(false);
-    } catch (error) {
-      if (error.response?.status === 404) {
-        setError('Blog post not found');
-      } else {
-        setError('Failed to fetch blog post data');
-      }
+    // If edit mode, fetch the post data
+    if (isEditMode) {
+      fetchPostData();
+    } else {
       setLoading(false);
     }
-  };
+  }, [isEditMode, navigate, location.pathname, fetchPostData]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;

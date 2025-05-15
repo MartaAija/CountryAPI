@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import apiClient, { formatErrorMessage } from '../../utils/apiClient';
 import { getBlogApiUrl } from '../../utils/apiUtils';
@@ -27,29 +27,6 @@ const getTimeAgo = (date) => {
   return Math.floor(seconds) + ' seconds ago';
 };
 
-// Helper function to handle throttled requests
-const handleThrottledRequest = async (requestFn, retryDelay = 2000, maxRetries = 3) => {
-  let retries = 0;
-  
-  const executeRequest = async () => {
-    try {
-      return await requestFn();
-    } catch (error) {
-      if (error.response && error.response.status === 429 && retries < maxRetries) {
-        console.warn(`Rate limited (429). Retrying in ${retryDelay}ms... (${retries + 1}/${maxRetries})`);
-        retries++;
-        // Wait for the retry delay
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
-        // Try again
-        return executeRequest();
-      }
-      throw error;
-    }
-  };
-  
-  return executeRequest();
-};
-
 function UserProfile() {
   const { userId } = useParams();
   const [user, setUser] = useState(null);
@@ -71,6 +48,32 @@ function UserProfile() {
   
   const navigate = useNavigate();
   const location = useLocation();
+  
+  const fetchMorePosts = useCallback(async (pageNumber) => {
+    try {
+      const { url, headers } = getBlogApiUrl('/posts');
+      const response = await apiClient.get(url.replace(config.apiBaseUrl, ''), {
+        params: { userId, page: pageNumber, limit: 10 },
+        headers: token ? { ...headers, Authorization: `Bearer ${token}` } : headers
+      });
+      
+      if (Array.isArray(response.data.posts)) {
+        setPosts(prevPosts => [...prevPosts, ...response.data.posts]);
+        
+        // Update hasMore based on pagination
+        if (response.data.pagination) {
+          const totalPages = response.data.pagination.totalPages || 0;
+          const currentPage = response.data.pagination.currentPage || 1;
+          setHasMore(currentPage < totalPages);
+        } else {
+          setHasMore(false);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching more posts:', error);
+      setError(formatErrorMessage(error));
+    }
+  }, [userId, token]);
   
   useEffect(() => {
     // Check if userId is provided
@@ -223,7 +226,7 @@ function UserProfile() {
     fetchUserData();
     // Reset page when userId changes
     setPage(1);
-  }, [userId, token]);
+  }, [userId, token, navigate, location.pathname, fetchMorePosts]);
   
   // Monitor posts state for debugging
   useEffect(() => {
@@ -237,7 +240,7 @@ function UserProfile() {
       console.debug(`Loading page ${page} for userId ${userId}`);
       fetchMorePosts(page);
     }
-  }, [page, userId]);
+  }, [page, userId, fetchMorePosts]);
   
   const handleFollow = async () => {
     if (!token) {
@@ -341,40 +344,6 @@ function UserProfile() {
     }
   };
   
-  const fetchMorePosts = async (pageNumber) => {
-    try {
-      console.debug(`Fetching additional posts for page ${pageNumber}`);
-      
-      // Ensure userId is a string
-      const userIdString = String(userId);
-      
-      // Get the API URL and headers
-      const { url, headers } = getBlogApiUrl('/posts');
-      
-      // Use apiClient directly for better error handling
-      const response = await apiClient.get(url, {
-        params: { userId: userIdString, page: pageNumber, limit: 10 },
-        headers: token ? { ...headers, Authorization: `Bearer ${token}` } : headers
-      });
-      
-      console.debug('Additional posts response:', response.data);
-      
-      // Append to existing posts
-      if (Array.isArray(response.data.posts)) {
-        setPosts(prevPosts => [...prevPosts, ...response.data.posts]);
-      }
-      
-      // Check if there are more pages to load
-      const currentPage = response.data.pagination?.currentPage || 1;
-      const totalPages = response.data.pagination?.totalPages || 1;
-      console.debug(`Pagination updated: ${currentPage} of ${totalPages}`);
-      setHasMore(currentPage < totalPages);
-    } catch (err) {
-      console.error('Error fetching more posts:', err);
-      setError(formatErrorMessage(err));
-    }
-  };
-
   const loadMore = () => {
     if (!loading && hasMore) {
       setPage(prevPage => prevPage + 1);

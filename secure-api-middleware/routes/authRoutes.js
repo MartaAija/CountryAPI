@@ -7,7 +7,6 @@ const router = express.Router();
 const authController = require('../controllers/authController');
 const authenticate = require('../middleware/authenticate');
 const { csrfGenerator, csrfProtection } = require('../middleware/csrfProtection');
-const apiKeyVerifier = require('../middleware/apiKeyVerifier');
 
 // Public Routes (no authentication required)
 router.get('/csrf-token', csrfGenerator, (req, res) => {
@@ -18,7 +17,7 @@ router.get('/csrf-token', csrfGenerator, (req, res) => {
 router.get('/admin/csrf-token', csrfGenerator, (req, res) => {
   res.json({ 
     message: 'Admin CSRF token set in cookie',
-    csrfToken: req.csrfToken // Also include token in response for debugging
+    csrfToken: req.csrfToken 
   });
 });
 

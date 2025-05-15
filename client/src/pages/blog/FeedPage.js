@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { blogApiGet, blogApiPost } from '../../utils/apiUtils';
 import { formatErrorMessage } from '../../utils/apiClient';
@@ -14,27 +14,7 @@ function FeedPage() {
   const navigate = useNavigate();
   const location = useLocation();
   
-  useEffect(() => {
-    // Check if user is authenticated
-    const checkAuth = async () => {
-      try {
-        const authenticated = await isAuthenticated();
-        if (!authenticated) {
-      navigate('/login', { state: { from: location.pathname } });
-      return;
-    }
-    
-    fetchFeed();
-      } catch (error) {
-        console.error('Authentication check failed:', error);
-        navigate('/login', { state: { from: location.pathname } });
-      }
-    };
-    
-    checkAuth();
-  }, [navigate, currentPage, location.pathname]);
-  
-  const fetchFeed = async () => {
+  const fetchFeed = useCallback(async () => {
     setLoading(true);
     try {
       // Use blogApiGet with automatic throttling protection
@@ -50,7 +30,27 @@ function FeedPage() {
       setError(formatErrorMessage(error));
       setLoading(false);
     }
-  };
+  }, [currentPage]);
+  
+  useEffect(() => {
+    // Check if user is authenticated
+    const checkAuth = async () => {
+      try {
+        const authenticated = await isAuthenticated();
+        if (!authenticated) {
+          navigate('/login', { state: { from: location.pathname } });
+          return;
+        }
+        
+        fetchFeed();
+      } catch (error) {
+        console.error('Authentication check failed:', error);
+        navigate('/login', { state: { from: location.pathname } });
+      }
+    };
+    
+    checkAuth();
+  }, [navigate, location.pathname, fetchFeed]);
   
   const handleReaction = async (postId, action) => {
     try {

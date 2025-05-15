@@ -1,5 +1,4 @@
 import apiClient from './apiClient';
-import config from '../config';
 
 /**
  * Authentication Service

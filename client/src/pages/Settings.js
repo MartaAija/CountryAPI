@@ -1,8 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
-import apiClient, { formatErrorMessage } from '../utils/apiClient';
+import apiClient from '../utils/apiClient';
 import { useNavigate, Link } from "react-router-dom";
 import '../App.css';
-import config from '../config';
 import { getBlogApiUrl } from '../utils/apiUtils';
 
 // Settings component that allows users to manage their account settings,
@@ -20,8 +19,8 @@ function Settings() {
     const [last_name, setLastName] = useState("");
     const [isEditing, setIsEditing] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [apiKeys, setApiKeys] = useState([]);
-    const [csrfToken, setCsrfToken] = useState("");
+    const [setApiKeys] = useState([]);
+    const [ setCsrfToken] = useState("");
     const [showPasswordChangeModal, setShowPasswordChangeModal] = useState(false);
     const [showEmailChangeModal, setShowEmailChangeModal] = useState(false);
     
@@ -38,9 +37,6 @@ function Settings() {
     // Add state for tracking key operations
     const [primaryKeyLoading, setPrimaryKeyLoading] = useState(false);
     const [secondaryKeyLoading, setSecondaryKeyLoading] = useState(false);
-
-    // Use config for API base URL
-    const API_BASE_URL = `${config.apiBaseUrl}/auth`;
 
     // Helper function to mask API key for security
     const maskApiKey = (key) => {
@@ -62,7 +58,7 @@ function Settings() {
         } catch (error) {
             console.error('Error fetching CSRF token:', error);
         }
-    }, []);
+    }, [setCsrfToken]);
 
     // Fetch user profile data with authentication token
     // Memoized with useCallback to prevent unnecessary re-renders
