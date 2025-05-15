@@ -40,10 +40,6 @@ function Navbar() {
             try {
                 // Check authentication status from cookies via API
                 const authStatus = await isAuthenticated();
-                // Only log auth status in development
-                if (process.env.NODE_ENV === 'development') {
-                    console.log('Authentication status:', authStatus);
-                }
                 
                 // Get the localStorage admin status
                 const localStorageAdmin = localStorage.getItem('isAdmin') === 'true';
@@ -52,9 +48,6 @@ function Navbar() {
                 // Detect and resolve inconsistency between cookie auth and localStorage
                 // This happens if user's session expired but localStorage values remain
                 if (!authStatus && (localStorageUserId || localStorageAdmin)) {
-                    if (process.env.NODE_ENV === 'development') {
-                        console.log('Cookie auth and localStorage out of sync, performing cleanup');
-                    }
                     await logout();
                     setUserAuthenticated(false);
                     setUserIsAdmin(false);
@@ -67,15 +60,9 @@ function Navbar() {
                 // Only check admin status if user is authenticated
                 if (authStatus) {
                     const adminStatus = await isAdmin();
-                    if (process.env.NODE_ENV === 'development') {
-                        console.log('Admin status:', adminStatus);
-                    }
                     
                     // Resolve admin status inconsistency if it exists
                     if (!adminStatus && localStorageAdmin) {
-                        if (process.env.NODE_ENV === 'development') {
-                            console.log('Admin status mismatch, fixing...');
-                        }
                         localStorage.removeItem('isAdmin');
                     }
                     
@@ -110,9 +97,6 @@ function Navbar() {
          * Triggered when login/logout happens elsewhere in the app
          */
         const handleAuthChange = () => {
-            if (process.env.NODE_ENV === 'development') {
-                console.log('Auth change event detected');
-            }
             updateAuthState();
         };
         
@@ -124,9 +108,6 @@ function Navbar() {
          */
         const checkAuthOnRouteChange = () => {
             if (location.pathname === '/logout') {
-                if (process.env.NODE_ENV === 'development') {
-                    console.log('Logout route detected, will update auth state');
-                }
                 setTimeout(updateAuthState, 500); // Small delay to ensure logout completes
             }
         };

@@ -27,13 +27,6 @@ const PORT = process.env.PORT || 5000;
 
 // Log environment information
 const isProduction = process.env.NODE_ENV === 'production';
-console.log(`
-==================================
-Server Environment: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}
-Frontend URL: ${isProduction ? 'https://traveltalesblog.netlify.app' : 'http://localhost:3000'}
-API URL: ${isProduction ? 'https://countryapi-production-5484.up.railway.app' : `http://localhost:${PORT}`}
-==================================
-`);
 
 // Security middleware
 app.use(helmet({
@@ -94,12 +87,6 @@ app.use(apiLimiter);
 
 // Apply sanitization middleware to all routes
 app.use(sanitizeRequestBody);
-
-// Log cookies for debugging
-app.use((req, res, next) => {
-  console.log('Cookies received:', req.cookies ? Object.keys(req.cookies) : 'No cookies');
-  next();
-});
 
 // Generate CSRF token for all routes
 app.use(csrfGenerator);

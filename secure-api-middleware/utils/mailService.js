@@ -19,8 +19,6 @@ const BASE_URL = process.env.NODE_ENV === 'production'
   ? (process.env.FRONTEND_URL || PRODUCTION_URL)
   : (process.env.BASE_URL || DEVELOPMENT_URL);
 
-console.log(`Mail service configured with base URL: ${BASE_URL}`);
-
 const SKIP_EMAIL_VERIFICATION = process.env.SKIP_EMAIL_VERIFICATION === 'true';
 
 // Create a nodemailer transporter using environment variables
@@ -31,9 +29,6 @@ if (!EMAIL_USER || !EMAIL_PASSWORD || SKIP_EMAIL_VERIFICATION) {
   // Use a fake transporter that doesn't actually send emails
   transporter = {
     sendMail: async (options) => {
-      console.log(`[DEV MODE] Email would be sent to: ${options.to}`);
-      console.log(`[DEV MODE] Subject: ${options.subject}`);
-      console.log(`[DEV MODE] Links would use base URL: ${BASE_URL}`);
       return { messageId: 'fake-message-id-' + Date.now() };
     }
   };
@@ -89,7 +84,6 @@ const sendVerificationEmail = async (to, token, userId) => {
     const info = await transporter.sendMail(mailOptions);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error('Error sending verification email:', error);
     return { success: false, error: error.message };
   }
 };
@@ -132,7 +126,6 @@ const sendPasswordResetEmail = async (to, token, userId) => {
     const info = await transporter.sendMail(mailOptions);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error('Error sending password reset email:', error);
     return { success: false, error: error.message };
   }
 };
@@ -166,7 +159,6 @@ const sendPasswordChangeConfirmation = async (to) => {
     const info = await transporter.sendMail(mailOptions);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error('Error sending password change confirmation email:', error);
     return { success: false, error: error.message };
   }
 };
@@ -215,7 +207,6 @@ const sendPasswordChangeVerificationEmail = async (to, token, userId) => {
     const info = await transporter.sendMail(mailOptions);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error('Error sending password change verification email:', error);
     return { success: false, error: error.message };
   }
 };
@@ -264,7 +255,6 @@ const sendEmailChangeVerificationEmail = async (to, token, userId) => {
     const info = await transporter.sendMail(mailOptions);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error('Error sending email change verification email:', error);
     return { success: false, error: error.message };
   }
 };
@@ -313,9 +303,14 @@ const sendEmailChangeConfirmation = async (oldEmail, newEmail) => {
       `
     };
     
+    // Send email to old address
+    await transporter.sendMail(oldEmailOptions);
+    
+    // Send email to new address
+    await transporter.sendMail(newEmailOptions);
+    
     return { success: true };
   } catch (error) {
-    console.error('Error sending email change confirmation:', error);
     return { success: false, error: error.message };
   }
 };

@@ -521,7 +521,6 @@ function Settings() {
                                         <button type="submit">Save Changes</button>
                                         <button 
                                             type="button" 
-                                            className="btn-secondary"
                                             onClick={() => {
                                                 setIsEditing(false);
                                                 setFirstName(userDetails.first_name || "");

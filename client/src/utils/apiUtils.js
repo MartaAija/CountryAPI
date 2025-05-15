@@ -33,7 +33,6 @@ export const getBlogApiUrl = (path) => {
     url = `${config.apiBaseUrl}${pathStr}`;
   }
   
-  console.log(`Blog API URL: ${url}`); // Debugging log
   return { url };
 };
 
@@ -67,7 +66,6 @@ export const getCountriesApiUrl = (path) => {
  */
 export const blogApiGet = async (path, options = {}) => {
   const { url } = getBlogApiUrl(path);
-  console.log(`Making GET request to: ${url}`);
   return apiClient.get(url, options);
 };
 
@@ -80,7 +78,6 @@ export const blogApiGet = async (path, options = {}) => {
  */
 export const blogApiPost = async (path, data = {}, options = {}) => {
   const { url } = getBlogApiUrl(path);
-  console.log(`Making POST request to: ${url}`);
   return apiClient.post(url, data, options);
 };
 
@@ -93,7 +90,6 @@ export const blogApiPost = async (path, data = {}, options = {}) => {
  */
 export const blogApiPut = async (path, data = {}, options = {}) => {
   const { url } = getBlogApiUrl(path);
-  console.log(`Making PUT request to: ${url}`);
   return apiClient.put(url, data, options);
 };
 
@@ -105,6 +101,5 @@ export const blogApiPut = async (path, data = {}, options = {}) => {
  */
 export const blogApiDelete = async (path, options = {}) => {
   const { url } = getBlogApiUrl(path);
-  console.log(`Making DELETE request to: ${url}`);
   return apiClient.delete(url, options);
 };

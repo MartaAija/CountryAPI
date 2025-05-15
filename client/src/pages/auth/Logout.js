@@ -19,8 +19,6 @@ function Logout() {
                 localStorage.removeItem('token');
                 localStorage.removeItem('activeApiKey');
                 
-                console.log("Logout successful, redirecting to login page");
-                
                 // Navigate to login page
                 navigate('/login');
             } catch (error) {

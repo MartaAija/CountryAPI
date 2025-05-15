@@ -74,7 +74,7 @@ async function registerUser(req, res) {
         const emailResult = await mailService.sendVerificationEmail(email, verificationToken, newUser.id);
         if (!emailResult.success) {
             // Log the error but continue with registration
-            console.log('Warning: Verification email could not be sent:', emailResult.error);
+            // Error is handled by the security logger
         }
         
         // Generate token for immediate login, but with short expiry
@@ -221,83 +221,82 @@ async function verifyEmail(req, res) {
     try {
         const { token, userId } = req.query;
         
-        console.log('Verification request received:', { userId, tokenLength: token?.length });
-        
         if (!token || !userId) {
-            console.log('Missing token or userId in request');
             return res.status(400).json({ error: "Missing token or userId" });
         }
         
         // First check if the user is already verified
-        console.log('Checking if user is already verified:', userId);
         const isAlreadyVerified = await UserDAO.isEmailVerified(userId);
-        console.log('Is user already verified:', isAlreadyVerified);
         
         if (isAlreadyVerified) {
             // User is already verified, generate a token and return success
-            console.log('User is already verified, finding user details');
             const user = await UserDAO.findById(userId);
             if (!user) {
-                console.log('User not found:', userId);
                 return res.status(404).json({ error: "User not found" });
             }
             
             // Generate new token with longer expiry
-            console.log('Generating new token for already verified user');
             const newToken = jwt.sign(
                 { id: userId, username: user.username },
                 process.env.JWT_SECRET,
                 { expiresIn: "1h" }
             );
             
-            return res.json({ 
-                message: "Email already verified. You have full access to your account.",
+            // Set token in HttpOnly cookie
+            res.cookie('auth_token', newToken, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+                maxAge: 3600000 // 1 hour
+            });
+            
+            // Send success response with token
+            return res.status(200).json({
+                message: "Your email is already verified. You can now login.",
                 token: newToken,
                 verified: true
             });
         }
         
-        // If not already verified, verify the token
-        console.log('Verifying token for user:', userId);
-        const decoded = tokenService.verifyToken(token, 'email_verification');
-        console.log('Token verification result:', decoded ? 'Valid token' : 'Invalid token');
+        // Otherwise verify the token
+        const verification = await UserDAO.verifyEmailWithToken(userId, token);
         
-        if (!decoded || decoded.userId != userId) {
-            console.log('Token validation failed:', { 
-                decodedUserId: decoded?.userId, 
-                requestUserId: userId,
-                tokenValid: !!decoded
-            });
-            return res.status(400).json({ error: "Invalid or expired verification link" });
+        if (!verification) {
+            // Invalid or expired token
+            return res.status(400).json({ error: "Invalid or expired verification token" });
         }
         
-        // Update user's verification status
-        console.log('Updating user verification status in database');
-        const verified = await UserDAO.verifyEmail(userId, token);
-        console.log('Database update result:', verified ? 'Success' : 'Failed');
-        
-        if (!verified) {
-            console.log('Database verification failed for user:', userId);
-            return res.status(400).json({ error: "Invalid or expired verification link" });
+        // Get user data
+        const user = await UserDAO.findById(userId);
+        if (!user) {
+            return res.status(404).json({ error: "User not found" });
         }
         
         // Generate new token with longer expiry now that email is verified
-        console.log('Generating new token for newly verified user');
         const newToken = jwt.sign(
-            { id: userId, username: decoded.username },
+            { id: userId, username: user.username },
             process.env.JWT_SECRET,
             { expiresIn: "1h" }
         );
         
-        console.log('Email verification successful for user:', userId);
-        res.json({ 
-            message: "Email verified successfully. You now have full access to your account.",
+        // Set token in HttpOnly cookie
+        res.cookie('auth_token', newToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+            maxAge: 3600000 // 1 hour
+        });
+        
+        // Send success response with token
+        res.status(200).json({
+            message: "Email verification successful! You can now login.",
             token: newToken,
             verified: true
         });
+        
     } catch (err) {
-        console.error('Email verification error:', err);
-        res.status(500).json({ error: "Server error: " + err.message });
+        console.error('Verification error:', err);
+        res.status(500).json({ error: "Server error during verification" });
     }
 }
 
@@ -610,88 +609,43 @@ async function generateNewApiKey(req, res) {
     }
 }
 
-// Toggle API Key Status
+/**
+ * API Key Status Toggle Handler
+ * Enable or disable a user's API key without deleting it
+ */
 async function toggleApiKeyStatus(req, res) {
+    const { userId } = req.params;
+    const { key_type, active } = req.body;
+    
+    // Sanitize and validate inputs
+    if (!userId || !key_type) {
+        return res.status(400).json({ error: "Missing required parameters" });
+    }
+    
+    // Ensure the user can only modify their own API key unless they're an admin
+    if (req.user.id != userId && !req.user.isAdmin) {
+        return res.status(403).json({ error: "You can only modify your own API keys" });
+    }
+    
+    // Parse the active flag with a default of false if not specified
+    const newStatus = active === true || active === 'true';
+
     try {
-        // Get userId from either params or the authenticated user
-        const currentUserId = req.user.id;
-        const paramsUserId = req.params.userId;
-        const userId = paramsUserId ? parseInt(paramsUserId) : currentUserId;
+        // Update the key status
+        const result = await UserDAO.updateApiKeyStatus(userId, key_type, newStatus);
         
-        // Security check: Users can only modify their own API keys
-        if (userId !== currentUserId) {
-            return res.status(403).json({ error: "You can only modify your own API keys" });
+        if (!result) {
+            return res.status(404).json({ error: "API key not found" });
         }
-        
-        // Get key_type from body
-        const { key_type, isActive } = req.body;
-
-        if (!key_type) {
-            return res.status(400).json({ error: "key_type is required" });
-        }
-
-        // If isActive is not provided, toggle the current status
-        let newStatus = isActive;
-        
-        if (newStatus === undefined) {
-            // Check if the API key exists first
-            const [keyResult] = await UserDAO.executeQuery(
-                `SELECT COUNT(*) as count FROM api_keys WHERE user_id = ? AND key_type = ?`,
-                [userId, key_type]
-            );
-            
-            if (!keyResult || !keyResult.length || keyResult[0].count === 0) {
-                return res.status(404).json({ error: `No ${key_type} API key found for this user` });
-            }
-            
-            // Get current status
-            const [keyStatusResult] = await UserDAO.executeQuery(
-                `SELECT is_active FROM api_keys WHERE user_id = ? AND key_type = ?`,
-                [userId, key_type]
-            );
-            
-            if (!keyStatusResult || keyStatusResult.length === 0) {
-                // If we can't get the status but we know the key exists, assume it's inactive and set to active
-                newStatus = true;
-            } else {
-                // Toggle the status
-                newStatus = !(keyStatusResult[0].is_active === 1 || keyStatusResult[0].is_active === true);
-            }
-        }
-        
-        console.log(`Toggling API key status for user ${userId}, key_type ${key_type} to ${newStatus}`);
-        
-        // If we're activating a key, we need to deactivate the other key type
-        if (newStatus) {
-            const otherKeyType = key_type === 'primary' ? 'secondary' : 'primary';
-            
-            // Deactivate the other key
-            await UserDAO.executeQuery(
-                `UPDATE api_keys SET is_active = false 
-                 WHERE user_id = ? AND key_type = ?`,
-                [userId, otherKeyType]
-            );
-        }
-        
-        // Update API key status
-        await UserDAO.executeQuery(
-            `UPDATE api_keys SET is_active = ? 
-             WHERE user_id = ? AND key_type = ?`,
-            [newStatus, userId, key_type]
-        );
-        
-        // Get updated user data
-        const updatedUser = await UserDAO.getUserWithProfileAndKeys(userId);
         
         res.json({ 
-            message: `API Key status updated successfully`,
+            message: `API key ${newStatus ? 'activated' : 'deactivated'} successfully`,
             key_type,
-            isActive: newStatus,
-            user: updatedUser
+            active: newStatus
         });
-    } catch (err) {
-        console.error("Error toggling API key status:", err);
-        res.status(500).json({ error: "Failed to update API key status" });
+    } catch (error) {
+        console.error('Error toggling API key status:', error);
+        res.status(500).json({ error: "Database error: " + error.message });
     }
 }
 

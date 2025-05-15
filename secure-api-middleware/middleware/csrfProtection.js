@@ -81,10 +81,6 @@ function cleanupExpiredTokens() {
             count++;
         }
     }
-    
-    if (count > 0) {
-        console.log(`Cleaned up ${count} expired CSRF tokens`);
-    }
 }
 
 // Set up periodic cleanup every hour
