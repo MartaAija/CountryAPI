@@ -80,11 +80,7 @@ function VerifyEmail({ type = 'verification' }) {
         
         // Redirect based on verification type
         const redirectTimeout = setTimeout(() => {
-          if (type === 'password' || type === 'email') {
-            navigate('/settings');
-          } else {
-            navigate('/login');
-          }
+          navigate('/login');
         }, 3000);
         
         return () => clearTimeout(redirectTimeout);
@@ -114,28 +110,16 @@ function VerifyEmail({ type = 'verification' }) {
   
   // Get appropriate redirect button based on verification type
   const getRedirectButton = () => {
-    if (type === 'password' || type === 'email') {
-      return (
-        <Link to="/settings" className="btn btn-primary">
-          Back to Settings
-        </Link>
-      );
-    } else {
-      return (
-        <Link to="/login" className="btn btn-primary">
-          Continue to Login
-        </Link>
-      );
-    }
+    return (
+      <Link to="/login" className="btn btn-primary">
+        Back to Login
+      </Link>
+    );
   };
   
   // Get redirect message based on verification type
   const getRedirectMessage = () => {
-    if (type === 'password' || type === 'email') {
-      return "You will be redirected to the settings page shortly.";
-    } else {
-      return "You will be redirected to the login page shortly.";
-    }
+    return "You will be redirected to the login page shortly.";
   };
   
   return (
@@ -165,11 +149,7 @@ function VerifyEmail({ type = 'verification' }) {
           <div className="error-message message">
             <p>{message}</p>
             <div className="controls">
-              {type === 'password' || type === 'email' ? (
-                <Link to="/settings" className="btn btn-primary">Back to Settings</Link>
-              ) : (
-                <Link to="/login" className="btn btn-primary">Back to Login</Link>
-              )}
+              <Link to="/login" className="btn btn-primary">Back to Login</Link>
             </div>
           </div>
         )}
