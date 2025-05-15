@@ -34,7 +34,7 @@ function BlogForm() {
     // Fetch countries for dropdown
     const fetchCountries = async () => {
       try {
-        const response = await apiClient.get('/countries');
+        const response = await apiClient.get('/countries/api');
         if (response.data && Array.isArray(response.data)) {
           setCountries(response.data);
         }

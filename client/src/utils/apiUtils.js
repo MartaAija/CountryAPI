@@ -55,6 +55,12 @@ export const getAuthApiUrl = (path) => {
 export const getCountriesApiUrl = (path) => {
   // Ensure path is a string
   const pathStr = String(path || '');
+  
+  // If no path is provided, use the API protected endpoint by default
+  if (!pathStr) {
+    return `${config.apiBaseUrl}/countries/api`;
+  }
+  
   return `${config.apiBaseUrl}/countries${pathStr.startsWith('/') ? pathStr : '/' + pathStr}`;
 };
 

@@ -671,21 +671,29 @@ async function getAllUsers(req, res) {
     }
 }
 
-// Admin: Delete User
+// Delete User Account
 async function deleteUser(req, res) {
     try {
-        const { userId } = req.params;
+        // If userId param is provided, it's an admin deleting a user
+        // Otherwise, it's the user deleting their own account
+        const userId = req.params.userId || req.user.id;
         
         // Delete user
-        const success = await UserDAO.delete(userId);
+        const success = await UserDAO.deleteUser(userId);
         
         if (!success) {
             return res.status(404).json({ error: "User not found" });
         }
         
-        res.json({ message: "User deleted successfully" });
+        // Clear auth token cookie if user is deleting their own account
+        if (!req.params.userId) {
+            res.clearCookie('auth_token');
+        }
+        
+        res.json({ message: "User account deleted successfully" });
     } catch (err) {
-        res.status(500).json({ error: "Failed to delete user" });
+        console.error("Error deleting user:", err);
+        res.status(500).json({ error: "Failed to delete user account" });
     }
 }
 

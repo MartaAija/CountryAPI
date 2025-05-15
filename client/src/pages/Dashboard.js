@@ -48,7 +48,7 @@ function Dashboard() {
         setError('');
         try {       
             // Use our backend API with apiClient
-            const response = await apiClient.get('/countries', {
+            const response = await apiClient.get('/countries/api', {
                 headers: { 
                     'X-API-Key': apiKey
                 }

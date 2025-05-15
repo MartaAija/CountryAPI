@@ -184,7 +184,7 @@ function Settings() {
     // Handle account deletion with confirmation dialog
     const handleDeleteAccount = async () => {
         try {
-            await apiClient.delete('/auth/account');
+            await apiClient.delete('/auth/delete-account');
             // Clear authentication and redirect to login page
             localStorage.removeItem("token");
             localStorage.removeItem("userId");
