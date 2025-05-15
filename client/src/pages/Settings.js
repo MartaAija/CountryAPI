@@ -19,8 +19,8 @@ function Settings() {
     const [last_name, setLastName] = useState("");
     const [isEditing, setIsEditing] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [setApiKeys] = useState([]);
-    const [ setCsrfToken] = useState("");
+    const [apiKeys, setApiKeys] = useState([]);
+    const [csrfToken, setCsrfToken] = useState("");
     const [showPasswordChangeModal, setShowPasswordChangeModal] = useState(false);
     const [showEmailChangeModal, setShowEmailChangeModal] = useState(false);
     
