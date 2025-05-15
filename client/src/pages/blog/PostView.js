@@ -197,7 +197,7 @@ function PostView() {
                 <div key={comment.id} className="comment">
                   <div className="comment-header">
                     <Link to={`/blog/user/${comment.user_id}`} className="comment-author">
-                      {comment.first_name} {comment.last_name} (@{post.username})
+                      {comment.first_name} {comment.last_name} (@{comment.username})
                     </Link>
                     <span className="comment-date">
                       {new Date(comment.created_at).toLocaleDateString()}
@@ -252,7 +252,7 @@ function PostView() {
                         <div key={reply.id} className="reply">
                           <div className="reply-header">
                             <Link to={`/blog/user/${reply.user_id}`} className="reply-author">
-                              {reply.first_name} {reply.last_name}
+                              {reply.first_name} {reply.last_name} (@{reply.username})
                             </Link>
                             <span className="reply-date">
                               {new Date(reply.created_at).toLocaleDateString()}
