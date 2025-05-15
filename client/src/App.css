@@ -31,6 +31,33 @@ body {
   min-height: 100vh;
 }
 
+/* Custom Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(9, 18, 44, 0.8);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--secondary-color);
+  border-radius: 5px;
+  transition: background 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-color);
+}
+
+/* For Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--secondary-color) rgba(9, 18, 44, 0.8);
+}
+
 /* Navigation Styles */
 .nav-container {
   background-color: rgba(9, 18, 44, 0.95);
@@ -1183,6 +1210,29 @@ form.form-group input[type="password"] {
     overflow-y: auto;
     z-index: 1000;
     box-shadow: var(--shadow-md);
+    scrollbar-width: thin;
+    scrollbar-color: var(--secondary-color) rgba(9, 18, 44, 0.8);
+}
+
+/* Custom scrollbar styling for search suggestions */
+.search-suggestions::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.search-suggestions::-webkit-scrollbar-track {
+    background: rgba(9, 18, 44, 0.8);
+    border-radius: 4px;
+}
+
+.search-suggestions::-webkit-scrollbar-thumb {
+    background: var(--secondary-color);
+    border-radius: 4px;
+    transition: background 0.3s ease;
+}
+
+.search-suggestions::-webkit-scrollbar-thumb:hover {
+    background: var(--primary-color);
 }
 
 .suggestion-item {
@@ -1881,7 +1931,6 @@ form.form-group input[type="password"] {
 .reply-form textarea {
   width: 100%;
   min-height: 120px;
-  padding: 1rem;
   background-color: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
@@ -3258,6 +3307,29 @@ form.form-group input[type="password"] {
   padding: 15px;
   max-height: 400px;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--secondary-color) rgba(9, 18, 44, 0.8);
+}
+
+/* Ensure the custom scrollbar styling is applied specifically to the blog posts container */
+.blog-posts-container::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.blog-posts-container::-webkit-scrollbar-track {
+  background: rgba(9, 18, 44, 0.8);
+  border-radius: 4px;
+}
+
+.blog-posts-container::-webkit-scrollbar-thumb {
+  background: var(--secondary-color);
+  border-radius: 4px;
+  transition: background 0.3s ease;
+}
+
+.blog-posts-container::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-color);
 }
 
 .blog-posts-list {
@@ -3419,6 +3491,29 @@ form.form-group input[type="password"] {
   border-top: none;
   border-radius: 0 0 4px 4px;
   z-index: 10;
+  scrollbar-width: thin;
+  scrollbar-color: var(--secondary-color) rgba(9, 18, 44, 0.8);
+}
+
+/* Custom scrollbar styling for username dropdown */
+.username-dropdown::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.username-dropdown::-webkit-scrollbar-track {
+  background: rgba(9, 18, 44, 0.8);
+  border-radius: 4px;
+}
+
+.username-dropdown::-webkit-scrollbar-thumb {
+  background: var(--secondary-color);
+  border-radius: 4px;
+  transition: background 0.3s ease;
+}
+
+.username-dropdown::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-color);
 }
 
 .username-option {
