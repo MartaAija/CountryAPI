@@ -196,7 +196,7 @@ function Settings() {
             }
             
             const response = await apiClient.post(
-                '/auth/password/change', 
+                '/auth/change-password', 
                 { 
                     current_password: oldPassword,
                     new_password: newPassword,
@@ -224,7 +224,7 @@ function Settings() {
         e.preventDefault();
         try {
             const response = await apiClient.post(
-                '/auth/email/change', 
+                '/auth/change-email', 
                 { 
                     current_email: oldEmail,
                     new_email: newEmail
@@ -250,7 +250,7 @@ function Settings() {
     const handleGenerateApiKey = async (keyType) => {
         try {
             const response = await apiClient.post(
-                '/auth/api-keys/generate',
+                '/auth/generate-api-key',
                 { key_type: keyType },
                 { 
                     headers: { 
@@ -259,7 +259,7 @@ function Settings() {
                 }
             );
             
-            if (response.data.api_key) {
+            if (response.data.apiKey) {
                 setMessage("New API key generated successfully");
                 await fetchUserData(); // Refresh user data to get the new API key
             } else {
@@ -377,13 +377,12 @@ function Settings() {
             
             // Use axios delete with query parameters
             const deleteResponse = await apiClient.delete(
-                `/auth/delete-api-key/${userDetails.id}`,
+                `/auth/delete-api-key/${userDetails.id}?key_type=${keyType}`,
                 { 
                 headers: { 
                     Authorization: `Bearer ${localStorage.getItem("token")}`,
                     'Content-Type': 'application/json'
-                },
-                data: { key_type: keyType }
+                }
                 }
             );
 
