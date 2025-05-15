@@ -10,7 +10,10 @@ import config from '../config';
 // Create a custom event for notifying components about auth state changes
 const AUTH_CHANGE_EVENT = 'auth-change';
 
-// Function to dispatch auth change event
+/**
+ * Dispatches a custom event to notify components about authentication state changes
+ * This is used to synchronize UI updates across components when auth state changes
+ */
 function notifyAuthChange() {
   window.dispatchEvent(new CustomEvent(AUTH_CHANGE_EVENT));
 }
@@ -35,9 +38,15 @@ export const registerUser = async (userData) => {
 
 /**
  * Login user with username and password
+ * 
+ * Authenticates a user by sending credentials to the server and
+ * storing the returned user information in localStorage for UI purposes.
+ * The actual authentication token is stored in an HttpOnly cookie by the server.
+ * 
  * @param {string} username - User's username
  * @param {string} password - User's password
  * @returns {Promise} - Response with auth token and user data
+ * @throws {Error} - If authentication fails
  */
 export const login = async (username, password) => {
   try {
@@ -58,9 +67,15 @@ export const login = async (username, password) => {
 
 /**
  * Login as admin
+ * 
+ * Authenticates an admin user using CSRF protection to prevent CSRF attacks.
+ * Gets a CSRF token first, then sends it along with credentials.
+ * Admin sessions use special flags both in cookies and localStorage.
+ * 
  * @param {string} username - Admin username
  * @param {string} password - Admin password
  * @returns {Promise} - Response from admin login endpoint
+ * @throws {Error} - If admin authentication fails
  */
 export const adminLogin = async (username, password) => {
   try {
@@ -93,6 +108,13 @@ export const adminLogin = async (username, password) => {
 
 /**
  * Logout user - clear localStorage and API cookie
+ * 
+ * Performs a complete logout by:
+ * 1. Clearing all authentication data from localStorage
+ * 2. Making an API request to clear HttpOnly cookies on the server
+ * 3. Notifying all components about the authentication state change
+ * 
+ * @returns {Promise<void>}
  */
 export const logout = async () => {
   try {
@@ -122,6 +144,14 @@ export const getProfile = async () => {
 
 /**
  * Check if user has an active session
+ * 
+ * Performs an optimized session check that:
+ * 1. First checks localStorage for any auth data to avoid unnecessary API calls
+ * 2. Makes an API call to verify the HttpOnly cookie is still valid
+ * 
+ * This dual-check approach provides both security (server validation)
+ * and performance (avoid unnecessary API calls).
+ * 
  * @returns {Promise<boolean>} - True if user has valid session
  */
 export const checkSession = async () => {
@@ -168,6 +198,14 @@ export const isAuthenticated = async () => {
 
 /**
  * Check if user is admin
+ * 
+ * Determines admin status through multiple checks:
+ * 1. First checks localStorage for admin flag to avoid unnecessary API calls
+ * 2. Then verifies against the server using HttpOnly cookie authentication
+ * 
+ * This ensures both UI responsiveness and security by validating admin status
+ * with the server before granting access to sensitive operations.
+ * 
  * @returns {Promise<boolean>} - True if user is admin
  */
 export const isAdmin = async () => {

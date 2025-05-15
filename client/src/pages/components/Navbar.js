@@ -3,7 +3,18 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { isAuthenticated, isAdmin, logout } from '../../utils/authService';
 import '../../App.css'; 
 
-// Main navigation component that dynamically updates based on user authentication status
+/**
+ * Navbar Component
+ * 
+ * A responsive navigation bar that dynamically updates based on user authentication status.
+ * Shows different navigation options for:
+ * - Unauthenticated users (visitors)
+ * - Regular authenticated users
+ * - Admin users
+ * 
+ * Handles auth state synchronization between localStorage and HttpOnly cookies
+ * to maintain security best practices while providing a good UX.
+ */
 function Navbar() {
     // Get current location to highlight active navigation link
     const location = useLocation();
@@ -15,9 +26,15 @@ function Navbar() {
     const [userIsAdmin, setUserIsAdmin] = useState(false);
     const [loading, setLoading] = useState(true);
 
-    // Effect to check authentication on mount and when auth changes
+    /**
+     * Effect hook to check authentication on mount and when auth changes
+     * Ensures auth state consistency between cookies and localStorage
+     */
     useEffect(() => {
-        // Function to update auth state from cookie-based authentication
+        /**
+         * Updates authentication state by checking both cookie auth (via API) and localStorage
+         * Resolves any inconsistencies between them to ensure proper state
+         */
         const updateAuthState = async () => {
             setLoading(true);
             try {
@@ -32,8 +49,8 @@ function Navbar() {
                 const localStorageAdmin = localStorage.getItem('isAdmin') === 'true';
                 const localStorageUserId = localStorage.getItem('userId');
                 
-                // If localStorage says user is authenticated but cookies say they aren't,
-                // we need to perform a full logout to sync the state
+                // Detect and resolve inconsistency between cookie auth and localStorage
+                // This happens if user's session expired but localStorage values remain
                 if (!authStatus && (localStorageUserId || localStorageAdmin)) {
                     if (process.env.NODE_ENV === 'development') {
                         console.log('Cookie auth and localStorage out of sync, performing cleanup');
@@ -54,7 +71,7 @@ function Navbar() {
                         console.log('Admin status:', adminStatus);
                     }
                     
-                    // If API says not admin but localStorage says admin, fix the mismatch
+                    // Resolve admin status inconsistency if it exists
                     if (!adminStatus && localStorageAdmin) {
                         if (process.env.NODE_ENV === 'development') {
                             console.log('Admin status mismatch, fixing...');
@@ -66,7 +83,7 @@ function Navbar() {
                 } else {
                     setUserIsAdmin(false);
                     
-                    // If not authenticated, clear localStorage items
+                    // Clean up localStorage if not authenticated
                     localStorage.removeItem('userId');
                     localStorage.removeItem('username');
                     localStorage.removeItem('isAdmin');
@@ -76,7 +93,7 @@ function Navbar() {
                 setUserAuthenticated(false);
                 setUserIsAdmin(false);
                 
-                // Clear localStorage on error
+                // Clean up localStorage on error as a precaution
                 localStorage.removeItem('userId');
                 localStorage.removeItem('username');
                 localStorage.removeItem('isAdmin');
@@ -88,7 +105,10 @@ function Navbar() {
         // Initial check
         updateAuthState();
         
-        // Listen for custom auth change events
+        /**
+         * Event listener for auth change events from other components
+         * Triggered when login/logout happens elsewhere in the app
+         */
         const handleAuthChange = () => {
             if (process.env.NODE_ENV === 'development') {
                 console.log('Auth change event detected');
@@ -98,7 +118,10 @@ function Navbar() {
         
         window.addEventListener('auth-change', handleAuthChange);
         
-        // Also recheck auth state on route changes to keep nav updated
+        /**
+         * Special case check for logout route to ensure navigation state updates
+         * Handles edge case where user directly navigates to /logout
+         */
         const checkAuthOnRouteChange = () => {
             if (location.pathname === '/logout') {
                 if (process.env.NODE_ENV === 'development') {
@@ -109,12 +132,18 @@ function Navbar() {
         };
         checkAuthOnRouteChange();
         
+        // Cleanup event listener on component unmount
         return () => {
             window.removeEventListener('auth-change', handleAuthChange);
         };
     }, [location.pathname]);
 
-    // Helper function to determine if a nav link should be highlighted as active
+    /**
+     * Determines if a nav link should be highlighted as active
+     * @param {string} path - The path to check against current location
+     * @param {string} param - Optional parameter for paths with URL params
+     * @returns {string} - 'active' class name if active, empty string otherwise
+     */
     const isActiveLink = (path, param = null) => {
         if (param) {
             // For paths with parameters like /blog/user/:userId
@@ -123,7 +152,7 @@ function Navbar() {
         return location.pathname === path ? 'active' : '';
     };
 
-    // If still loading auth status, show minimal navbar
+    // Display a minimal navbar during authentication check
     if (loading) {
         return (
             <nav className="nav-container">

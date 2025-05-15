@@ -57,6 +57,14 @@ function validateToken(sessionId, token) {
     if (!storedData) {
         return false;
     }
+    
+    // Check if token matches and is not expired
+    const expiryTime = 3600000; // 1 hour in milliseconds
+    const now = Date.now();
+    const tokenAge = now - storedData.createdAt;
+    
+    // Token is valid if it matches and is not expired
+    return token === storedData.token && tokenAge < expiryTime;
 }
 
 /**
