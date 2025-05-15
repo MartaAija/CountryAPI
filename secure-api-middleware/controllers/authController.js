@@ -259,7 +259,7 @@ async function verifyEmail(req, res) {
         }
         
         // Otherwise verify the token
-        const verification = await UserDAO.verifyEmailWithToken(userId, token);
+        const verification = await UserDAO.verifyEmail(userId, token);
         
         if (!verification) {
             // Invalid or expired token
