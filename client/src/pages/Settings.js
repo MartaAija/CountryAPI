@@ -81,6 +81,16 @@ function Settings() {
             setEmail(response.data.email || "");
             setOldEmail(response.data.email || "");
             
+            // Initialize the active API key in localStorage if one is active
+            if (response.data.is_active_primary && response.data.api_key_primary) {
+                localStorage.setItem('activeApiKey', response.data.api_key_primary);
+            } else if (response.data.is_active_secondary && response.data.api_key_secondary) {
+                localStorage.setItem('activeApiKey', response.data.api_key_secondary);
+            } else {
+                // If no keys are active, remove any stored key
+                localStorage.removeItem('activeApiKey');
+            }
+            
             // Reset visibility state when loading new data
             setShowPrimaryKey(false);
             setShowSecondaryKey(false);
@@ -159,7 +169,7 @@ function Settings() {
         e.preventDefault();
         try {
             const response = await apiClient.post(
-                '/auth/profile/update',
+                '/auth/update-profile',
                 { first_name, last_name },
                 { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }}
             );
@@ -260,6 +270,9 @@ function Settings() {
             );
             
             if (response.data.apiKey) {
+                // Store the new API key as the active key in localStorage
+                localStorage.setItem('activeApiKey', response.data.apiKey);
+                
                 setMessage("New API key generated successfully");
                 await fetchUserData(); // Refresh user data to get the new API key
             } else {
@@ -311,7 +324,7 @@ function Settings() {
                 `/auth/toggle-api-key/${userDetails.id}`,
                     { 
                         key_type: keyType, 
-                        isActive: Boolean(newStatus) // Ensure it's a proper boolean
+                        active: Boolean(newStatus) // Ensure it's a proper boolean
                     },
                 { 
                     headers: { 
@@ -322,10 +335,28 @@ function Settings() {
                 
                 if (toggleResponse.data.user) {
                     // Update user details with the updated API key information from server
-                setUserDetails(prevState => ({
-                    ...prevState,
+                    setUserDetails(prevState => ({
+                        ...prevState,
                         ...toggleResponse.data.user
-                }));
+                    }));
+                    
+                    // Store or remove the active API key in localStorage
+                    if (newStatus) {
+                        // If activating this key, store it in localStorage for future API requests
+                        localStorage.setItem('activeApiKey', userDetails[`api_key_${keyType}`]);
+                        
+                        // If we're activating one key, we're deactivating the other, so make sure we have the right one stored
+                        const otherKeyType = keyType === 'primary' ? 'secondary' : 'primary';
+                        if (localStorage.getItem('activeApiKey') === userDetails[`api_key_${otherKeyType}`]) {
+                            localStorage.setItem('activeApiKey', userDetails[`api_key_${keyType}`]);
+                        }
+                    } else {
+                        // If deactivating this key, remove it if it matches the one in localStorage
+                        if (localStorage.getItem('activeApiKey') === userDetails[`api_key_${keyType}`]) {
+                            localStorage.removeItem('activeApiKey');
+                        }
+                    }
+                    
                     setMessage(`${keyType.charAt(0).toUpperCase() + keyType.slice(1)} API key ${newStatus ? 'activated' : 'deactivated'} successfully`);
                 } else if (toggleResponse.data.message) {
                     setMessage(toggleResponse.data.message);
@@ -375,6 +406,10 @@ function Settings() {
                 return;
             }
             
+            // Check if this key is the active one in localStorage
+            const currentActiveKey = localStorage.getItem('activeApiKey');
+            const keyBeingDeleted = userDetails[`api_key_${keyType}`];
+            
             // Use axios delete with query parameters
             const deleteResponse = await apiClient.delete(
                 `/auth/delete-api-key/${userDetails.id}?key_type=${keyType}`,
@@ -388,6 +423,12 @@ function Settings() {
 
             if (deleteResponse.data.success) {
                 setMessage(`${keyType} API key deleted successfully`);
+                
+                // If we deleted the active key, remove it from localStorage
+                if (currentActiveKey === keyBeingDeleted) {
+                    localStorage.removeItem('activeApiKey');
+                }
+                
                 // Update local state if the user data was returned
                 if (deleteResponse.data.user) {
                     setUserDetails(deleteResponse.data.user);

@@ -45,13 +45,13 @@ function BlogForm() {
     };
 
     fetchCountries();
-
-    // If edit mode, fetch the post data
-    if (isEditMode) {
-      fetchPostData();
-    } else {
-      setLoading(false);
-    }
+        
+        // If edit mode, fetch the post data
+        if (isEditMode) {
+          fetchPostData();
+        } else {
+          setLoading(false);
+        }
   }, [isEditMode, id, navigate, location.pathname]);
 
   const fetchPostData = async () => {
@@ -129,7 +129,7 @@ function BlogForm() {
       }
       
       setTimeout(() => {
-        navigate('/blog');
+      navigate('/blog');
       }, 1500);
     } catch (error) {
       console.error('Error submitting blog post:', error);

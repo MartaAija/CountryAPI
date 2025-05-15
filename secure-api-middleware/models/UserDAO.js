@@ -652,6 +652,47 @@ class UserDAO extends BaseDAO {
       throw error;
     }
   }
+
+  /**
+   * Update API key active status
+   * @param {number} userId - The user ID
+   * @param {string} keyType - The key type ('primary' or 'secondary')
+   * @param {boolean} isActive - The new status (true for active, false for inactive)
+   * @returns {Promise<boolean>} - True if successful
+   */
+  async updateApiKeyStatus(userId, keyType, isActive) {
+    try {
+      // Check if the key exists
+      const [existingKeys] = await this.pool.query(
+        `SELECT id FROM api_keys WHERE user_id = ? AND key_type = ?`,
+        [userId, keyType]
+      );
+      
+      if (existingKeys.length === 0) {
+        return false; // Key doesn't exist
+      }
+      
+      // Update the key status
+      const [result] = await this.pool.query(
+        `UPDATE api_keys SET is_active = ? WHERE user_id = ? AND key_type = ?`,
+        [isActive, userId, keyType]
+      );
+      
+      // If activating a key, deactivate the other key type for exclusivity
+      if (isActive) {
+        const otherKeyType = keyType === 'primary' ? 'secondary' : 'primary';
+        await this.pool.query(
+          `UPDATE api_keys SET is_active = false WHERE user_id = ? AND key_type = ?`,
+          [userId, otherKeyType]
+        );
+      }
+      
+      return result.affectedRows > 0;
+    } catch (error) {
+      console.error('Error in UserDAO.updateApiKeyStatus:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = new UserDAO(); 

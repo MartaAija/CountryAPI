@@ -20,11 +20,11 @@ function FeedPage() {
       try {
         const authenticated = await isAuthenticated();
         if (!authenticated) {
-          navigate('/login', { state: { from: location.pathname } });
-          return;
-        }
-        
-        fetchFeed();
+      navigate('/login', { state: { from: location.pathname } });
+      return;
+    }
+    
+    fetchFeed();
       } catch (error) {
         console.error('Authentication check failed:', error);
         navigate('/login', { state: { from: location.pathname } });

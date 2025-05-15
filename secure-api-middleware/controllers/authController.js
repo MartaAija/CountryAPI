@@ -176,7 +176,7 @@ async function loginUser(req, res) {
             process.env.JWT_SECRET || 'fallback-jwt-secret',
             { expiresIn: "1h" } // Normal expiry for verified users
         );
-        
+
         // Set token in HttpOnly cookie
         res.cookie('auth_token', token, {
             httpOnly: true,
@@ -616,17 +616,17 @@ async function generateNewApiKey(req, res) {
 async function toggleApiKeyStatus(req, res) {
     const { userId } = req.params;
     const { key_type, active } = req.body;
-    
+        
     // Sanitize and validate inputs
     if (!userId || !key_type) {
         return res.status(400).json({ error: "Missing required parameters" });
-    }
-    
+        }
+
     // Ensure the user can only modify their own API key unless they're an admin
     if (req.user.id != userId && !req.user.isAdmin) {
         return res.status(403).json({ error: "You can only modify your own API keys" });
-    }
-    
+            }
+            
     // Parse the active flag with a default of false if not specified
     const newStatus = active === true || active === 'true';
 
