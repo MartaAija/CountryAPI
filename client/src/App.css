@@ -303,6 +303,7 @@ button:hover:not(:disabled),
   transform: translateY(-2px);
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
   opacity: 0.95;
+  color:white;
 }
 
 button:active,
@@ -3067,6 +3068,7 @@ form.form-group input[type="password"] {
   background-color: #d02a3a;
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(190, 49, 68, 0.25);
+  color:white
 }
 
 .blog-form .btn-secondary {
