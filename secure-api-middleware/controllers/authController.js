@@ -582,26 +582,31 @@ async function verifyEmailChange(req, res) {
 async function generateNewApiKey(req, res) {
     try {
         const userId = req.user.id;
-        const { keyType } = req.body; // 'primary' or 'secondary'
+        const { key_type } = req.body; // 'primary' or 'secondary'
+        
+        if (!key_type) {
+            return res.status(400).json({ error: "key_type is required (must be 'primary' or 'secondary')" });
+        }
         
         // Check cooldown period
-        const cooldown = checkCooldown(userId, keyType);
+        const cooldown = checkCooldown(userId, key_type);
         if (cooldown.onCooldown) {
             return res.status(429).json({ error: cooldown.message });
         }
         
         // Generate new API key
-        const apiKey = await UserDAO.generateNewApiKey(userId, keyType);
+        const apiKey = await UserDAO.generateNewApiKey(userId, key_type);
         
         // Update the cooldown timestamp
-        updateCooldown(userId, keyType);
+        updateCooldown(userId, key_type);
 
         res.json({ 
-            message: `New ${keyType} API Key generated successfully`,
+            message: `New ${key_type} API Key generated successfully`,
             apiKey: apiKey
         });
     } catch (err) {
-        res.status(500).json({ error: "Failed to generate API key" });
+        console.error('Error generating API key:', err);
+        res.status(500).json({ error: "Failed to generate API key: " + (err.message || "Unknown error") });
     }
 }
 
@@ -618,11 +623,11 @@ async function toggleApiKeyStatus(req, res) {
             return res.status(403).json({ error: "You can only modify your own API keys" });
         }
         
-        // Get keyType from body
-        const { keyType, isActive } = req.body;
+        // Get key_type from body
+        const { key_type, isActive } = req.body;
 
-        if (!keyType) {
-            return res.status(400).json({ error: "Key type is required" });
+        if (!key_type) {
+            return res.status(400).json({ error: "key_type is required" });
         }
 
         // If isActive is not provided, toggle the current status
@@ -632,17 +637,17 @@ async function toggleApiKeyStatus(req, res) {
             // Check if the API key exists first
             const [keyResult] = await UserDAO.executeQuery(
                 `SELECT COUNT(*) as count FROM api_keys WHERE user_id = ? AND key_type = ?`,
-                [userId, keyType]
+                [userId, key_type]
             );
             
             if (!keyResult || !keyResult.length || keyResult[0].count === 0) {
-                return res.status(404).json({ error: `No ${keyType} API key found for this user` });
+                return res.status(404).json({ error: `No ${key_type} API key found for this user` });
             }
             
             // Get current status
             const [keyStatusResult] = await UserDAO.executeQuery(
                 `SELECT is_active FROM api_keys WHERE user_id = ? AND key_type = ?`,
-                [userId, keyType]
+                [userId, key_type]
             );
             
             if (!keyStatusResult || keyStatusResult.length === 0) {
@@ -654,11 +659,11 @@ async function toggleApiKeyStatus(req, res) {
             }
         }
         
-        console.log(`Toggling API key status for user ${userId}, keyType ${keyType} to ${newStatus}`);
+        console.log(`Toggling API key status for user ${userId}, key_type ${key_type} to ${newStatus}`);
         
         // If we're activating a key, we need to deactivate the other key type
         if (newStatus) {
-            const otherKeyType = keyType === 'primary' ? 'secondary' : 'primary';
+            const otherKeyType = key_type === 'primary' ? 'secondary' : 'primary';
             
             // Deactivate the other key
             await UserDAO.executeQuery(
@@ -672,7 +677,7 @@ async function toggleApiKeyStatus(req, res) {
         await UserDAO.executeQuery(
             `UPDATE api_keys SET is_active = ? 
              WHERE user_id = ? AND key_type = ?`,
-            [newStatus, userId, keyType]
+            [newStatus, userId, key_type]
         );
         
         // Get updated user data
@@ -680,7 +685,7 @@ async function toggleApiKeyStatus(req, res) {
         
         res.json({ 
             message: `API Key status updated successfully`,
-            keyType,
+            key_type,
             isActive: newStatus,
             user: updatedUser
         });
@@ -735,11 +740,11 @@ async function deleteApiKey(req, res) {
     try {
         const currentUserId = req.user.id;
         const { userId } = req.params;
-        const { keyType } = req.query; // Get keyType from query parameters
+        const { key_type } = req.query; // Get key_type from query parameters
         
         // Validate input
-        if (!keyType) {
-            return res.status(400).json({ error: "Key type is required" });
+        if (!key_type) {
+            return res.status(400).json({ error: "key_type is required" });
         }
         
         // Security check: Users can only delete their own API keys
@@ -750,7 +755,7 @@ async function deleteApiKey(req, res) {
         // Delete the API key by setting it to null
         await UserDAO.executeQuery(
             `DELETE FROM api_keys WHERE user_id = ? AND key_type = ?`,
-            [currentUserId, keyType]
+            [currentUserId, key_type]
         );
         
         // Get updated user data

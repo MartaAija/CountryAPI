@@ -310,7 +310,7 @@ function Settings() {
                 const toggleResponse = await apiClient.post(
                 `/auth/toggle-api-key/${userDetails.id}`,
                     { 
-                        keyType: keyType, 
+                        key_type: keyType, 
                         isActive: Boolean(newStatus) // Ensure it's a proper boolean
                     },
                 { 
