@@ -142,7 +142,7 @@ function PostView() {
           <span className="post-country">📍 {post.country_name}</span>
           <span className="post-author">
             ✍️ By <Link to={`/blog/user/${post.user_id}`}>
-              {post.first_name} {post.last_name}
+              {post.first_name} {post.last_name} (@{post.username})
             </Link>
           </span>
           <span className="post-date">
@@ -197,7 +197,7 @@ function PostView() {
                 <div key={comment.id} className="comment">
                   <div className="comment-header">
                     <Link to={`/blog/user/${comment.user_id}`} className="comment-author">
-                      {comment.first_name} {comment.last_name}
+                      {comment.first_name} {comment.last_name} (@{post.username})
                     </Link>
                     <span className="comment-date">
                       {new Date(comment.created_at).toLocaleDateString()}
