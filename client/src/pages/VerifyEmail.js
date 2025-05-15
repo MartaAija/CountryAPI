@@ -54,7 +54,15 @@ function VerifyEmail({ type = 'verification' }) {
         
         // Set success status and message
         setStatus('success');
-        setMessage(response.data.message);
+        
+        // Customize message based on verification type
+        if (type === 'password') {
+          setMessage('Your password has been successfully changed! Please log out and log in again to use your new password.');
+        } else if (type === 'email') {
+          setMessage('Your email address has been successfully updated!');
+        } else {
+          setMessage(response.data.message);
+        }
         
         // For backward compatibility, will be handled properly by HttpOnly cookies
         if (response.data.logout) {
@@ -71,10 +79,16 @@ function VerifyEmail({ type = 'verification' }) {
           localStorage.setItem('verified', 'true');
         }
         
-        // Auto-redirect to login page after 3 seconds
-        setTimeout(() => {
-          navigate('/login');
+        // Redirect based on verification type
+        const redirectTimeout = setTimeout(() => {
+          if (type === 'password' || type === 'email') {
+            navigate('/settings');
+          } else {
+            navigate('/login');
+          }
         }, 3000);
+        
+        return () => clearTimeout(redirectTimeout);
       } catch (error) {
         console.error('Verification error:', error);
         // Set error status and message
@@ -99,6 +113,32 @@ function VerifyEmail({ type = 'verification' }) {
     }
   };
   
+  // Get appropriate redirect button based on verification type
+  const getRedirectButton = () => {
+    if (type === 'password' || type === 'email') {
+      return (
+        <Link to="/settings" className="btn btn-primary">
+          Back to Settings
+        </Link>
+      );
+    } else {
+      return (
+        <Link to="/login" className="btn btn-primary">
+          Continue to Login
+        </Link>
+      );
+    }
+  };
+  
+  // Get redirect message based on verification type
+  const getRedirectMessage = () => {
+    if (type === 'password' || type === 'email') {
+      return "You will be redirected to the settings page shortly.";
+    } else {
+      return "You will be redirected to the login page shortly.";
+    }
+  };
+  
   return (
     <div className="page-container">
       <div className="form-container">
@@ -117,8 +157,8 @@ function VerifyEmail({ type = 'verification' }) {
         {status === 'success' && (
           <div className="success-message message">
             <p>{message}</p>
-            <p>You will be redirected to the login page shortly.</p>
-            <Link to="/login" className="btn btn-primary">Continue to Login</Link>
+            <p>{getRedirectMessage()}</p>
+            {getRedirectButton()}
           </div>
         )}
         
@@ -126,7 +166,11 @@ function VerifyEmail({ type = 'verification' }) {
           <div className="error-message message">
             <p>{message}</p>
             <div className="controls">
-              <Link to="/login" className="btn btn-primary">Back to Login</Link>
+              {type === 'password' || type === 'email' ? (
+                <Link to="/settings" className="btn btn-primary">Back to Settings</Link>
+              ) : (
+                <Link to="/login" className="btn btn-primary">Back to Login</Link>
+              )}
             </div>
           </div>
         )}
