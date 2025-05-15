@@ -2676,7 +2676,7 @@ form.form-group input[type="password"] {
 /* First approach using :has() for modern browsers */
 .home-posts-grid:has(> :only-child),
 .home-posts-grid:has(> :nth-child(2):last-child) {
-  grid-template-columns: minmax(300px, 400px);
+  grid-template-columns: minmax(750px, 400px);
   justify-content: center;
 }
 
@@ -2758,7 +2758,7 @@ form.form-group input[type="password"] {
 /* First approach using :has() for modern browsers */
 .popular-posts-grid:has(> :only-child),
 .popular-posts-grid:has(> :nth-child(2):last-child) {
-  grid-template-columns: minmax(300px, 400px);
+  grid-template-columns: minmax(500px, 400px);
   justify-content: center;
 }
 
